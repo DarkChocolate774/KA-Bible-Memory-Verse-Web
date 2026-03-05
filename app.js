@@ -49,6 +49,8 @@ else{
     verseText.textContent = "Click 'Manage Verses' to add one."
 }
 
+}
+
 function loadVerse(id)
 {
 const verse = verses.find(v => v.id === id)
@@ -220,7 +222,15 @@ function refreshVerses(){
 }
 
 function rebuildDropdown(selectedId){
+    refreshVerses()
     verseSelect.innerHTML = ""
+
+    if(verse.length === 0){
+        refText.textContent = "No verses yet"
+        verseText.textContent = "Click 'Manage Verses' to add one."
+        return
+    }
+
     verses.forEach(v => {
         const option = document.createElement("option")
         option.value = v.id

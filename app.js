@@ -1,4 +1,4 @@
-const DEFAULT_VERSES = [
+/*const DEFAULT_VERSES = [
 {
 id: "john316",
 ref: "John 3:16",
@@ -14,7 +14,7 @@ id: "matt311",
 ref: "Matthew 3:11",
 text: "I baptize you with water for repentance but after me comes one who is more powerful than I whose sandals I am not worthy to carry."
 }
-]
+]*/
 
 let verses = []
 

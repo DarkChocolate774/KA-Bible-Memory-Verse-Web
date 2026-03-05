@@ -1,15 +1,4 @@
-const DEFAULT_VERSES = [
-{
-id: "john316",
-ref: "John 3:16",
-text: "For God so loved the world that he gave his one and only Son that whoever believes in him shall not perish but have eternal life."
-},
-{
-id: "1 Corinthains 10:13",
-ref: "1 Corinthains 10:13",
-text: "The temptations in your life are no different from what others experience. And God is faithful. He will not allow the temptation to be more than you can stand. When you are tempted, he will show you a way out so that you can endure."
-},
-]
+const DEFAULT_VERSES = []
 
 let verses = []
 
@@ -55,6 +44,9 @@ verseSelect.appendChild(option)
 if(verses.length > 0){
     loadVerse(verses[0].id)
 }
+else{
+    refText.textContent = "No verses yet"
+    verseText.textContent = "Click 'Manage Verses' to add one."
 }
 
 function loadVerse(id)

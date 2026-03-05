@@ -197,3 +197,7 @@ input:focus{
 .ghost{
     background: rgba(255, 255, 255, 0.04);
 }
+
+.tab.active{
+    border-color: rgba(90, 167, 255, 0.8);
+}

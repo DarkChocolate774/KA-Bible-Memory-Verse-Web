@@ -16,7 +16,6 @@ const btnCheck = document.getElementById("btnCheck")
 const btnGiveHint = document.getElementById("btnGiveHint")
 const btnHideAll = document.getElementById("btnHideAll")
 
-const btnManage = document.getElementById("btnManage")
 const btnCloseManage = document.getElementById("btnCloseManage")
 const newText = document.getElementById("newText")
 const ManageMsg = document.getElementById("ManageMsg")
@@ -43,11 +42,15 @@ verseSelect.appendChild(option)
 })
 
 if(verses.length > 0){
+    setPracticeEnabled(true)
     loadVerse(verses[0].id)
 }
 else{
+    setPracticeEnabled(false)
     refText.textContent = "No verses yet"
-    verseText.textContent = "Click 'Manage Verses' to add one."
+    verseText.textContent = "Go to Library to add one."
+    setTypingEnabled(false)
+    return
 }
 
 }
@@ -227,8 +230,10 @@ function rebuildDropdown(selectedId){
     verseSelect.innerHTML = ""
 
     if(verses.length === 0){
+        setPracticeEnabled(false)
         refText.textContent = "No verses yet"
-        verseText.textContent = "Click 'Manage Verses' to add one."
+        verseText.textContent = "Go to Library to add one."
+        setTypingEnabled(false)
         return
     }
 
@@ -241,21 +246,8 @@ function rebuildDropdown(selectedId){
 
     const idToLoad = selectedId || verses[0].id
     verseSelect.value = idToLoad
+    setPracticeEnabled(true)
     loadVerse(idToLoad)
-}
-
-function openManage(){
-    managePanel.classList.remove("isHidden")
-    ManageMsg.textContent = ""
-    renderCustomList()
-    newRef.focus()
-}
-
-function closeManage(){
-    managePanel.classList.add("isHidden")
-    ManageMsg.textContent = ""
-    newRef.value = ""
-    newText.value = ""
 }
 
 function renderCustomList(){
@@ -293,7 +285,7 @@ function renderCustomList(){
         useBtn.addEventListener("click", () => {
             refreshVerses()
             rebuildDropdown(v.id)
-            closeManage()
+            showPage("practice")
         })
 
         const delBtn = document.createElement("button")
@@ -358,6 +350,17 @@ function deleteCustomVerse(id){
 
   refreshVerses()
 
+  if(verses.length === 0){
+    verseSelect.innerHTML = ""
+    setPracticeEnabled(false)
+    refText.textContent = "No verses yet"
+    verseText.textContent = "Go to Library to add one."
+    setTypingEnabled(false)
+    renderCustomList()
+    ManageMsg.textContent = "Deleted."
+    return
+  }
+
   const currentSelected = verseSelect.value
   const stillExists = verses.some(v => v.id === currentSelected)
 
@@ -398,6 +401,19 @@ function saveNewVerse(){
   newRef.focus()
 }
 
+function setPracticeEnabled(enabled){
+  btnRevealOne.disabled = !enabled
+  btnHideMore.disabled = !enabled
+  btnHideAll.disabled = !enabled
+  btnReset.disabled = !enabled
+  btnCheck.disabled = !enabled
+  btnGiveHint.disabled = !enabled
+  if(!enabled){
+    result.textContent = ""
+    answer.value = ""
+  }
+}
+
 
 verseSelect.addEventListener("change",e =>
 {
@@ -410,9 +426,50 @@ btnReset.addEventListener("click",resetVerse)
 btnCheck.addEventListener("click",checkAnswer)
 btnGiveHint.addEventListener("click",giveHint)
 btnHideAll.addEventListener("click",toggleHideAll)
-btnManage.addEventListener("click",openManage)
-btnCloseManage.addEventListener("click",closeManage)
+btnCloseManage.addEventListener("click", () => showPage("practice"))
 btnSaveVerse.addEventListener("click",saveNewVerse)
+
+const tabPractice = document.getElementById("tabPractice")
+const tabLibrary = document.getElementById("tabLibrary")
+const tabSettings = document.getElementById("tabSettings")
+
+const pagePractice = document.getElementById("pagePractice")
+const pageLibrary = document.getElementById("pageLibrary")
+const pageSettings = document.getElementById("pageSettings")
+
+function showPage(name){
+  pagePractice.classList.add("isHidden")
+  pageLibrary.classList.add("isHidden")
+  pageSettings.classList.add("isHidden")
+
+  tabPractice.classList.remove("active")
+  tabLibrary.classList.remove("active")
+  tabSettings.classList.remove("active")
+
+  if(name === "practice"){
+    pagePractice.classList.remove("isHidden")
+    tabPractice.classList.add("active")
+    refreshVerses()
+    setPracticeEnabled(verses.length > 0)
+  }
+
+  if(name === "library"){
+    pageLibrary.classList.remove("isHidden")
+    tabLibrary.classList.add("active")
+    renderCustomList()
+  }
+
+  if(name === "settings"){
+    pageSettings.classList.remove("isHidden")
+    tabSettings.classList.add("active")
+  }
+}
+
+tabPractice.addEventListener("click", () => showPage("practice"))
+tabLibrary.addEventListener("click", () => showPage("library"))
+tabSettings.addEventListener("click", () => showPage("settings"))
+
+showPage("practice")
 
 loadVerses()
 loadStats()

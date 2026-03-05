@@ -23,6 +23,7 @@ const ManageMsg = document.getElementById("ManageMsg")
 const customList = document.getElementById("customList")
 const managePanel = document.getElementById("managePanel")
 const newRef = document.getElementById("newRef")
+const btnSaveVerse = document.getElementById("btnSaveVerse")
 
 let words = []
 let hiddenIndexes = []
@@ -225,7 +226,7 @@ function rebuildDropdown(selectedId){
     refreshVerses()
     verseSelect.innerHTML = ""
 
-    if(verse.length === 0){
+    if(verses.length === 0){
         refText.textContent = "No verses yet"
         verseText.textContent = "Click 'Manage Verses' to add one."
         return

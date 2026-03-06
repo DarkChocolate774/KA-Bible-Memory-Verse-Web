@@ -903,7 +903,7 @@ function autoFillFromPastedText() {
   const raw = (pasteBox.value || "").trim()
 
   if (!raw) {
-    manageMsg.textContent = "Please paste the YouVersion text first."
+    manageMsg.textContent = "Please paste the Bible text first."
     return
   }
 
@@ -918,40 +918,60 @@ function autoFillFromPastedText() {
   }
 
   const urlPattern = /^https?:\/\/\S+$/i
-  const filteredLines = lines.filter(line => !urlPattern.test(line))
+  const urlLine = lines.find(line => urlPattern.test(line)) || ""
+  const contentLines = lines.filter(line => !urlPattern.test(line))
 
-  if (filteredLines.length === 0) {
+  if (contentLines.length === 0) {
     manageMsg.textContent = "Could not find verse text."
     return
   }
 
   let referenceLine = ""
-  let verseLines = filteredLines.slice()
-
-  if (filteredLines.length >= 2) {
-    referenceLine = filteredLines[filteredLines.length - 1]
-    verseLines = filteredLines.slice(0, -1)
-  }
-
-  const verseTextOnly = verseLines.join(" ").trim()
-
-  const cleanedVerseText = verseTextOnly
-    .replace(/^['"“”‘’]+\s*/, "")
-    .replace(/\s*['"“”‘’]+$/, "")
-    .replace(/\s+/g, " ")
-    .trim()
-
   let version = ""
-
-  const urlLine = lines.find(line => line.includes("bible.com"))
+  let verseLines = []
 
   if (urlLine) {
-    const match = urlLine.match(/\.([A-Z0-9]+)$/i)
-
-    if (match) {
-      version = match[1].toUpperCase()
+    const versionMatch = urlLine.match(/\.([A-Z0-9]+)$/i)
+    if (versionMatch) {
+      version = versionMatch[1].toUpperCase()
     }
   }
+
+  const firstLine = contentLines[0] || ""
+  const lastLine = contentLines[contentLines.length - 1] || ""
+
+  const looksLikeReference = (line) => {
+    return /\d+:\d+/.test(line)
+  }
+
+  if (looksLikeReference(firstLine)) {
+    referenceLine = firstLine
+
+    if (!version) {
+      const refVersionMatch = firstLine.match(/\b([A-Z]{2,})$/)
+      if (refVersionMatch) {
+        version = refVersionMatch[1].toUpperCase()
+      }
+    }
+
+    referenceLine = referenceLine.replace(/\b([A-Z]{2,})$/, "").trim()
+    verseLines = contentLines.slice(1)
+  } else if (looksLikeReference(lastLine)) {
+    referenceLine = lastLine
+    verseLines = contentLines.slice(0, -1)
+  } else {
+    verseLines = contentLines.slice()
+  }
+
+  let cleanedVerseText = verseLines.join(" ").trim()
+
+  cleanedVerseText = cleanedVerseText
+    .replace(/^\[\d+\]\s*/, "")
+    .replace(/^['"“”‘’]+\s*/, "")
+    .replace(/\s*['"“”‘’]+$/, "")
+    .replace(/\[\d+\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
 
   newRef.value = referenceLine
   newVersion.value = version

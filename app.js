@@ -1,3 +1,34 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"
+
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyC9ree98RpN5OlY5GnzKoLwT04WLxQm3sE",
+  authDomain: "scripture-memory-c047d.firebaseapp.com",
+  projectId: "scripture-memory-c047d",
+  storageBucket: "scripture-memory-c047d.firebasestorage.app",
+  messagingSenderId: "875411886063",
+  appId: "1:875411886063:web:53f418ad0191b224c3b01a",
+  measurementId: "G-ZN6DMGBSK4"
+};
+
+const app = initializeApp(firebaseConfig)
+
 const DEFAULT_VERSES = []
 
 let titlePuzzleHidden = []
@@ -22,6 +53,10 @@ let puzzleSlots = []
 let selectedBankWord = ""
 let titleWordCount = 0
 let dragDifficulty = 1
+
+const btnLogin = document.getElementById("btnLogin")
+const btnLogout = document.getElementById("btnLogout")
+const authMsg = document.getElementById("authMsg")
 
 const newTitle = document.getElementById("newTitle")
 const practiceTitle = document.getElementById("practiceTitle")
@@ -86,24 +121,111 @@ const titleLettersSection = document.getElementById("titleLettersSection")
 const titleLettersGame = document.getElementById("titleLettersGame")
 const verseLettersGame = document.getElementById("verseLettersGame")
 
-function getCustomVerses() {
-  const raw = localStorage.getItem("customVerses")
-  if (!raw) return []
+const auth = getAuth(app)
+const db = getFirestore(app)
+const provider = new GoogleAuthProvider()
+
+let currentUser = null
+
+  async function loginWithGoogle() {
+  console.log("login button clicked")
 
   try {
-    const data = JSON.parse(raw)
-    return Array.isArray(data) ? data : []
+    await signInWithPopup(auth, provider)
+    console.log("popup opened or login succeeded")
   } catch (error) {
-    return []
+    console.error("Google login error:", error)
+    authMsg.textContent = "Login failed."
   }
 }
 
-function setCustomVerses(list) {
-  localStorage.setItem("customVerses", JSON.stringify(list))
+async function logoutUser() {
+  try {
+    await signOut(auth)
+  } catch (error) {
+    console.error(error)
+    authMsg.textContent = "Logout failed."
+  }
+}
+
+onAuthStateChanged(auth, async (user) => {
+  currentUser = user || null
+
+  if (currentUser) {
+    authMsg.textContent = "Signed in as " + (currentUser.displayName || currentUser.email || "User")
+    btnLogin.classList.add("isHidden")
+    btnLogout.classList.remove("isHidden")
+
+    await loadVersesFromCloud()
+  } else {
+    authMsg.textContent = "Not signed in."
+    btnLogin.classList.remove("isHidden")
+    btnLogout.classList.add("isHidden")
+
+    verses = []
+    selectedVerseId = ""
+    titleWords = []
+    verseWords = []
+
+    answer.value = ""
+    if (titleAnswer) titleAnswer.value = ""
+    result.textContent = ""
+    result.className = "result"
+
+    renderLibrary()
+    setPracticeEnabled(false)
+    practiceVerseTitle.textContent = "No verses yet"
+    verseText.textContent = "Please log in to load your verses."
+    setTypingEnabled(false)
+  }
+})
+
+async function loadVersesFromCloud() {
+  if (!currentUser) {
+    verses = []
+    renderLibrary()
+    return
+  }
+
+  try {
+    const versesRef = collection(db, "users", currentUser.uid, "verses")
+    const snapshot = await getDocs(versesRef)
+
+    const cloudVerses = []
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data()
+      cloudVerses.push({
+        id: docSnap.id,
+        title: data.title || "",
+        ref: data.ref || "",
+        version: data.version || "",
+        text: data.text || ""
+      })
+    })
+
+    verses = DEFAULT_VERSES.concat(cloudVerses)
+    renderLibrary()
+
+    if (verses.length > 0) {
+      loadVerse(verses[0].id)
+      setPracticeEnabled(true)
+    } else {
+      setPracticeEnabled(false)
+      practiceVerseTitle.textContent = "No verses yet"
+      verseText.textContent = "Go to Library to add one."
+      setTypingEnabled(false)
+    }
+  } catch (error) {
+    console.error("Load verses failed:", error)
+    manageMsg.textContent = "Failed to load cloud verses."
+  }
 }
 
 function refreshVerses() {
-  verses = DEFAULT_VERSES.concat(getCustomVerses())
+  if (!Array.isArray(verses)) {
+    verses = []
+  }
 }
 
 function normalize(text) {
@@ -1082,7 +1204,7 @@ function confirmDelete(id, row) {
   title.textContent = "Delete this verse?"
 
   const small = document.createElement("small")
-  small.textContent = "This removes it from your browser only."
+  small.textContent = "This removes it from your cloud only."
 
   meta.appendChild(title)
   meta.appendChild(small)
@@ -1114,67 +1236,72 @@ function confirmDelete(id, row) {
   row.appendChild(actions)
 }
 
-function saveNewVerse() {
+async function saveNewVerse() {
   const title = newTitle.value.trim()
   const ref = newRef.value.trim()
   const version = newVersion.value.trim()
   const text = newText.value.trim()
 
-  if (!ref || !text) {
-    manageMsg.textContent = "Please fill in version, reference and verse text."
+  if (!currentUser) {
+    manageMsg.textContent = "Please log in first."
     return
   }
 
-  const custom = getCustomVerses()
-  const item = {
-    id: "custom_" + Date.now(),
-    title,
-    ref,
-    version,
-    text
+  if (!ref || !text) {
+    manageMsg.textContent = "Please fill in reference and verse text."
+    return
   }
 
-  custom.unshift(item)
-  setCustomVerses(custom)
+  try {
+    const versesRef = collection(db, "users", currentUser.uid, "verses")
 
-  refreshVerses()
-  rebuildDropdown(item.id)
-  renderLibrary()
+    await addDoc(versesRef, {
+      title,
+      ref,
+      version,
+      text,
+      createdAt: serverTimestamp()
+    })
 
-  manageMsg.textContent = "Saved."
-  pasteBox.value = ""
-  newTitle.value = ""
-  newRef.value = ""
-  newVersion.value = ""
-  newText.value = ""
-  pasteBox.focus()
+    manageMsg.textContent = "Saved."
+    pasteBox.value = ""
+    newTitle.value = ""
+    newRef.value = ""
+    newVersion.value = ""
+    newText.value = ""
+    pasteBox.focus()
+
+    await loadVersesFromCloud()
+  } catch (error) {
+    console.error("Save verse failed:", error)
+    manageMsg.textContent = "Failed to save verse."
+  }
 }
 
-function deleteCustomVerse(id) {
-  const custom = getCustomVerses().filter(verse => verse.id !== id)
-  setCustomVerses(custom)
-
-  refreshVerses()
-
-  if (verses.length === 0) {
-    setPracticeEnabled(false)
-    practiceVerseTitle.textContent = "No verses yet"
-    verseText.textContent = "Go to Library to add one."
-    setTypingEnabled(false)
-    renderLibrary()
-    manageMsg.textContent = "Deleted."
-    showPage("library")
+async function deleteCustomVerse(id) {
+  if (!currentUser) {
+    manageMsg.textContent = "Please log in first."
     return
   }
 
-  const stillExists = verses.some(v => v.id === selectedVerseId)
-  const nextId = stillExists ? selectedVerseId : verses[0].id
+  try {
+    await deleteDoc(doc(db, "users", currentUser.uid, "verses", id))
 
-  rebuildDropdown(nextId)
+    await loadVersesFromCloud()
 
-  renderLibrary()
-  manageMsg.textContent = "Deleted."
-  showPage("library")
+    if (verses.length === 0) {
+      setPracticeEnabled(false)
+      practiceVerseTitle.textContent = "No verses yet"
+      verseText.textContent = "Go to Library to add one."
+      setTypingEnabled(false)
+    }
+
+    manageMsg.textContent = "Deleted."
+    showPage("library")
+  } catch (error) {
+    console.error("Delete verse failed:", error)
+    manageMsg.textContent = "Failed to delete verse."
+  }
 }
 
 function autoFillFromPastedText() {
@@ -1272,6 +1399,9 @@ btnAutoFill.addEventListener("click", autoFillFromPastedText)
 
 btnSaveVerse.addEventListener("click", saveNewVerse)
 btnBackToLibrary.addEventListener("click", () => showPage("library"))
+
+btnLogin.addEventListener("click", loginWithGoogle)
+btnLogout.addEventListener("click", logoutUser)
 
 tabLibrary.addEventListener("click", () => showPage("library"))
 tabSettings.addEventListener("click", () => showPage("settings"))

@@ -21,6 +21,7 @@ let puzzleHidden = []
 let puzzleSlots = []
 let selectedBankWord = ""
 let titleWordCount = 0
+let dragDifficulty = 1
 
 const newTitle = document.getElementById("newTitle")
 const practiceTitle = document.getElementById("practiceTitle")
@@ -303,38 +304,20 @@ function resetTypeMode() {
 }
 
 function buildDragPuzzle() {
-  selectedTitleBankWord = ""
+
+  const difficultyLevels = [0.2, 0.35, 0.5, 0.7, 0.9]
+  const ratio = difficultyLevels[Math.min(dragDifficulty - 1, difficultyLevels.length - 1)]
+
+  const hideCount = Math.max(1, Math.floor(verseWords.length * ratio))
+
+  versePuzzleHidden = []
   selectedVerseBankWord = ""
 
-  titlePuzzleHidden = []
-  titlePuzzleSlots = []
-  versePuzzleHidden = []
-  versePuzzleSlots = []
+  const indexes = verseWords.map((word, index) => index)
 
-  if (titleWords.length > 0) {
-    const titleHideCount = Math.max(1, Math.min(3, Math.floor(titleWords.length * 0.5) || 1))
-    const titleIndexes = titleWords.map((word, index) => index)
-
-    while (titlePuzzleHidden.length < titleHideCount && titleIndexes.length > 0) {
-      const randomPos = Math.floor(Math.random() * titleIndexes.length)
-      titlePuzzleHidden.push(titleIndexes.splice(randomPos, 1)[0])
-    }
-
-    titlePuzzleHidden.sort((a, b) => a - b)
-
-    titlePuzzleSlots = titlePuzzleHidden.map(index => ({
-      index,
-      expected: titleWords[index],
-      filled: ""
-    }))
-  }
-
-  const verseHideCount = Math.max(1, Math.min(5, Math.floor(verseWords.length * 0.25) || 1))
-  const verseIndexes = verseWords.map((word, index) => index)
-
-  while (versePuzzleHidden.length < verseHideCount && verseIndexes.length > 0) {
-    const randomPos = Math.floor(Math.random() * verseIndexes.length)
-    versePuzzleHidden.push(verseIndexes.splice(randomPos, 1)[0])
+  while (versePuzzleHidden.length < hideCount && indexes.length > 0) {
+    const randomPos = Math.floor(Math.random() * indexes.length)
+    versePuzzleHidden.push(indexes.splice(randomPos, 1)[0])
   }
 
   versePuzzleHidden.sort((a, b) => a - b)
@@ -727,6 +710,7 @@ function checkDragMode() {
 
   if (percent === 100) {
     saveScore()
+    dragDifficulty += 1
   }
 }
 
@@ -859,18 +843,18 @@ function revealOneBlank() {
 function revealOneLetterBox() {
   const titleUnfinished = titleLettersGame
     ? Array.from(titleLettersGame.querySelectorAll(".letterWord")).filter(wrapper => {
-        const input = wrapper.querySelector(".letterBox")
-        const fullWord = wrapper.querySelector(".fullWord")
-        return input && fullWord && fullWord.classList.contains("isHidden")
-      })
+      const input = wrapper.querySelector(".letterBox")
+      const fullWord = wrapper.querySelector(".fullWord")
+      return input && fullWord && fullWord.classList.contains("isHidden")
+    })
     : []
 
   const verseUnfinished = verseLettersGame
     ? Array.from(verseLettersGame.querySelectorAll(".letterWord")).filter(wrapper => {
-        const input = wrapper.querySelector(".letterBox")
-        const fullWord = wrapper.querySelector(".fullWord")
-        return input && fullWord && fullWord.classList.contains("isHidden")
-      })
+      const input = wrapper.querySelector(".letterBox")
+      const fullWord = wrapper.querySelector(".fullWord")
+      return input && fullWord && fullWord.classList.contains("isHidden")
+    })
     : []
 
   if (titleUnfinished.length > 0) {
@@ -913,6 +897,7 @@ function giveHint() {
 
 function resetCurrentGame() {
   if (currentMode === "drag") {
+    dragDifficulty += 1
     buildDragPuzzle()
     result.textContent = ""
     result.className = "result"

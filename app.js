@@ -1,5 +1,15 @@
 const DEFAULT_VERSES = []
 
+let titlePuzzleHidden = []
+let titlePuzzleSlots = []
+let versePuzzleHidden = []
+let versePuzzleSlots = []
+let selectedTitleBankWord = ""
+let selectedVerseBankWord = ""
+
+let titleWords = []
+let verseWords = []
+
 let verses = []
 let words = []
 let hiddenIndexes = []
@@ -10,6 +20,11 @@ let currentMode = "type"
 let puzzleHidden = []
 let puzzleSlots = []
 let selectedBankWord = ""
+let titleWordCount = 0
+
+const newTitle = document.getElementById("newTitle")
+const practiceTitle = document.getElementById("practiceTitle")
+const gameMemoryTitle = document.getElementById("gameMemoryTitle")
 
 const pagePractice = document.getElementById("pagePractice")
 const pageLibrary = document.getElementById("pageLibrary")
@@ -28,9 +43,7 @@ const modeDrag = document.getElementById("modeDrag")
 const modeLetters = document.getElementById("modeLetters")
 const btnBackToLibrary = document.getElementById("btnBackToLibrary")
 
-const verseSelect = document.getElementById("verseSelect")
 const verseText = document.getElementById("verseText")
-const refText = document.getElementById("refText")
 const result = document.getElementById("result")
 const stats = document.getElementById("stats")
 const answer = document.getElementById("answer")
@@ -59,6 +72,18 @@ const themeSelect = document.getElementById("themeSelect")
 const settingsMsg = document.getElementById("settingsMsg")
 const newVersion = document.getElementById("newVersion")
 const btnBackToGame = document.getElementById("btnBackToGame")
+const practiceVerseTitle = document.getElementById("practiceVerseTitle")
+
+const titleAnswerRow = document.getElementById("titleAnswerRow")
+const titleAnswer = document.getElementById("titleAnswer")
+
+const titleDragSection = document.getElementById("titleDragSection")
+const titleBlankLine = document.getElementById("titleBlankLine")
+const titleWordBank = document.getElementById("titleWordBank")
+
+const titleLettersSection = document.getElementById("titleLettersSection")
+const titleLettersGame = document.getElementById("titleLettersGame")
+const verseLettersGame = document.getElementById("verseLettersGame")
 
 function getCustomVerses() {
   const raw = localStorage.getItem("customVerses")
@@ -91,6 +116,10 @@ function normalize(text) {
 function setTypingEnabled(enabled) {
   answer.disabled = !enabled
   answer.placeholder = enabled ? "Start typing here." : "Hide words first to type."
+
+  if (titleAnswer) {
+    titleAnswer.disabled = !enabled
+  }
 }
 
 function setPracticeEnabled(enabled) {
@@ -143,12 +172,34 @@ function loadVerse(id) {
   if (!verse) return
 
   selectedVerseId = id
-  refText.textContent = verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref
-  words = verse.text.split(" ")
+
+  const fullRef = verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref
+  practiceVerseTitle.textContent = fullRef
+
+  titleWords = verse.title ? verse.title.split(/\s+/) : []
+  verseWords = verse.text.split(/\s+/)
+
+  if (practiceTitle) {
+    practiceTitle.textContent = ""
+    practiceTitle.classList.add("isHidden")
+  }
+
+  if (titleAnswerRow) {
+    titleAnswerRow.classList.toggle("isHidden", titleWords.length === 0)
+  }
+
+  if (titleAnswer) {
+    titleAnswer.value = ""
+  }
+
+  words = [...verseWords]
+
   hiddenIndexes = []
   puzzleHidden = []
   puzzleSlots = []
   selectedBankWord = ""
+
+  titleWordCount = titleWords.length
 
   renderVerse()
   answer.value = ""
@@ -156,49 +207,21 @@ function loadVerse(id) {
   result.className = "result"
 }
 
-function loadVerses() {
-  refreshVerses()
-  verseSelect.innerHTML = ""
-
-  verses.forEach(v => {
-    const option = document.createElement("option")
-    option.value = v.id
-    option.textContent = v.ref
-    verseSelect.appendChild(option)
-  })
-
-  if (verses.length > 0) {
-    setPracticeEnabled(true)
-    loadVerse(verses[0].id)
-  } else {
-    setPracticeEnabled(false)
-    refText.textContent = "No verses yet"
-    verseText.textContent = "Go to Library to add one."
-    setTypingEnabled(false)
-  }
-}
-
 function rebuildDropdown(selectedId) {
   refreshVerses()
-  verseSelect.innerHTML = ""
 
   if (verses.length === 0) {
     setPracticeEnabled(false)
-    refText.textContent = "No verses yet"
+    practiceVerseTitle.textContent = "No verses yet"
     verseText.textContent = "Go to Library to add one."
     setTypingEnabled(false)
     return
   }
 
-  verses.forEach(v => {
-    const option = document.createElement("option")
-    option.value = v.id
-    option.textContent = v.ref
-    verseSelect.appendChild(option)
-  })
+  const idToLoad = selectedId && verses.some(v => v.id === selectedId)
+    ? selectedId
+    : verses[0].id
 
-  const idToLoad = selectedId && verses.some(v => v.id === selectedId) ? selectedId : verses[0].id
-  verseSelect.value = idToLoad
   setPracticeEnabled(true)
   loadVerse(idToLoad)
 }
@@ -268,30 +291,57 @@ function resetTypeMode() {
   renderVerse()
   setTypingEnabled(true)
   answer.value = ""
+  if (titleAnswer) titleAnswer.value = ""
   result.textContent = ""
   result.className = "result"
-  answer.focus()
+
+  if (titleAnswerRow && !titleAnswerRow.classList.contains("isHidden")) {
+    titleAnswer.focus()
+  } else {
+    answer.focus()
+  }
 }
 
 function buildDragPuzzle() {
-  const rawHideCount = Math.floor(words.length * 0.25)
-  const hideCount = Math.max(1, Math.min(5, rawHideCount || 1))
+  selectedTitleBankWord = ""
+  selectedVerseBankWord = ""
 
-  puzzleHidden = []
-  selectedBankWord = ""
+  titlePuzzleHidden = []
+  titlePuzzleSlots = []
+  versePuzzleHidden = []
+  versePuzzleSlots = []
 
-  const indexes = words.map((word, index) => index)
+  if (titleWords.length > 0) {
+    const titleHideCount = Math.max(1, Math.min(3, Math.floor(titleWords.length * 0.5) || 1))
+    const titleIndexes = titleWords.map((word, index) => index)
 
-  while (puzzleHidden.length < hideCount && indexes.length > 0) {
-    const randomPos = Math.floor(Math.random() * indexes.length)
-    puzzleHidden.push(indexes.splice(randomPos, 1)[0])
+    while (titlePuzzleHidden.length < titleHideCount && titleIndexes.length > 0) {
+      const randomPos = Math.floor(Math.random() * titleIndexes.length)
+      titlePuzzleHidden.push(titleIndexes.splice(randomPos, 1)[0])
+    }
+
+    titlePuzzleHidden.sort((a, b) => a - b)
+
+    titlePuzzleSlots = titlePuzzleHidden.map(index => ({
+      index,
+      expected: titleWords[index],
+      filled: ""
+    }))
   }
 
-  puzzleHidden.sort((a, b) => a - b)
+  const verseHideCount = Math.max(1, Math.min(5, Math.floor(verseWords.length * 0.25) || 1))
+  const verseIndexes = verseWords.map((word, index) => index)
 
-  puzzleSlots = puzzleHidden.map(index => ({
+  while (versePuzzleHidden.length < verseHideCount && verseIndexes.length > 0) {
+    const randomPos = Math.floor(Math.random() * verseIndexes.length)
+    versePuzzleHidden.push(verseIndexes.splice(randomPos, 1)[0])
+  }
+
+  versePuzzleHidden.sort((a, b) => a - b)
+
+  versePuzzleSlots = versePuzzleHidden.map(index => ({
     index,
-    expected: words[index],
+    expected: verseWords[index],
     filled: ""
   }))
 
@@ -302,12 +352,93 @@ function renderDragPuzzle() {
   blankLine.innerHTML = ""
   wordBank.innerHTML = ""
 
-  const hiddenSet = new Set(puzzleHidden)
+  if (titleDragSection) {
+    titleDragSection.classList.toggle("isHidden", titleWords.length === 0)
+  }
 
-  for (let i = 0; i < words.length; i++) {
-    if (hiddenSet.has(i)) {
+  if (titleBlankLine) titleBlankLine.innerHTML = ""
+  if (titleWordBank) titleWordBank.innerHTML = ""
+
+  if (titleWords.length > 0 && titleBlankLine && titleWordBank) {
+    const titleHiddenSet = new Set(titlePuzzleHidden)
+
+    for (let i = 0; i < titleWords.length; i++) {
+      if (titleHiddenSet.has(i)) {
+        const blank = document.createElement("span")
+        const slot = titlePuzzleSlots.find(s => s.index === i)
+
+        blank.textContent = slot && slot.filled ? slot.filled : "_____"
+        blank.className = slot && slot.filled ? "blank filled" : "blank"
+
+        blank.addEventListener("dragover", event => {
+          event.preventDefault()
+        })
+
+        blank.addEventListener("drop", event => {
+          event.preventDefault()
+          const word = event.dataTransfer.getData("text/plain")
+          fillTitleBlank(i, word)
+        })
+
+        blank.addEventListener("click", () => {
+          const currentSlot = titlePuzzleSlots.find(s => s.index === i)
+          if (!currentSlot) return
+
+          if (selectedTitleBankWord) {
+            currentSlot.filled = selectedTitleBankWord
+            selectedTitleBankWord = ""
+            renderDragPuzzle()
+            return
+          }
+
+          if (currentSlot.filled) {
+            currentSlot.filled = ""
+            renderDragPuzzle()
+          }
+        })
+
+        titleBlankLine.appendChild(blank)
+      } else {
+        const span = document.createElement("span")
+        span.textContent = titleWords[i]
+        titleBlankLine.appendChild(span)
+      }
+
+      titleBlankLine.appendChild(document.createTextNode(" "))
+    }
+
+    const titleBankWords = titlePuzzleSlots
+      .filter(slot => !slot.filled)
+      .map(slot => slot.expected)
+
+    titleBankWords.sort(() => Math.random() - 0.5)
+
+    titleBankWords.forEach(word => {
+      const pill = document.createElement("span")
+      pill.className = "pill"
+      pill.textContent = word
+      pill.draggable = true
+
+      pill.addEventListener("dragstart", event => {
+        event.dataTransfer.setData("text/plain", word)
+      })
+
+      pill.addEventListener("click", () => {
+        selectedTitleBankWord = word
+        titleWordBank.querySelectorAll(".pill").forEach(p => p.classList.remove("active"))
+        pill.classList.add("active")
+      })
+
+      titleWordBank.appendChild(pill)
+    })
+  }
+
+  const verseHiddenSet = new Set(versePuzzleHidden)
+
+  for (let i = 0; i < verseWords.length; i++) {
+    if (verseHiddenSet.has(i)) {
       const blank = document.createElement("span")
-      const slot = puzzleSlots.find(s => s.index === i)
+      const slot = versePuzzleSlots.find(s => s.index === i)
 
       blank.textContent = slot && slot.filled ? slot.filled : "_____"
       blank.className = slot && slot.filled ? "blank filled" : "blank"
@@ -319,16 +450,16 @@ function renderDragPuzzle() {
       blank.addEventListener("drop", event => {
         event.preventDefault()
         const word = event.dataTransfer.getData("text/plain")
-        fillBlank(i, word)
+        fillVerseBlank(i, word)
       })
 
       blank.addEventListener("click", () => {
-        const currentSlot = puzzleSlots.find(s => s.index === i)
+        const currentSlot = versePuzzleSlots.find(s => s.index === i)
         if (!currentSlot) return
 
-        if (selectedBankWord) {
-          currentSlot.filled = selectedBankWord
-          selectedBankWord = ""
+        if (selectedVerseBankWord) {
+          currentSlot.filled = selectedVerseBankWord
+          selectedVerseBankWord = ""
           renderDragPuzzle()
           return
         }
@@ -342,20 +473,20 @@ function renderDragPuzzle() {
       blankLine.appendChild(blank)
     } else {
       const span = document.createElement("span")
-      span.textContent = words[i]
+      span.textContent = verseWords[i]
       blankLine.appendChild(span)
     }
 
     blankLine.appendChild(document.createTextNode(" "))
   }
 
-  const bankWords = puzzleSlots
+  const verseBankWords = versePuzzleSlots
     .filter(slot => !slot.filled)
     .map(slot => slot.expected)
 
-  bankWords.sort(() => Math.random() - 0.5)
+  verseBankWords.sort(() => Math.random() - 0.5)
 
-  bankWords.forEach(word => {
+  verseBankWords.forEach(word => {
     const pill = document.createElement("span")
     pill.className = "pill"
     pill.textContent = word
@@ -366,13 +497,31 @@ function renderDragPuzzle() {
     })
 
     pill.addEventListener("click", () => {
-      selectedBankWord = word
-      document.querySelectorAll(".pill").forEach(p => p.classList.remove("active"))
+      selectedVerseBankWord = word
+      wordBank.querySelectorAll(".pill").forEach(p => p.classList.remove("active"))
       pill.classList.add("active")
     })
 
     wordBank.appendChild(pill)
   })
+}
+
+function fillTitleBlank(index, word) {
+  const slot = titlePuzzleSlots.find(s => s.index === index)
+  if (!slot || !word) return
+
+  slot.filled = word
+  selectedTitleBankWord = ""
+  renderDragPuzzle()
+}
+
+function fillVerseBlank(index, word) {
+  const slot = versePuzzleSlots.find(s => s.index === index)
+  if (!slot || !word) return
+
+  slot.filled = word
+  selectedVerseBankWord = ""
+  renderDragPuzzle()
 }
 
 function fillBlank(index, word) {
@@ -385,9 +534,35 @@ function fillBlank(index, word) {
 }
 
 function renderLettersGame() {
-  lettersGame.innerHTML = ""
+  if (titleLettersSection) {
+    titleLettersSection.classList.toggle("isHidden", titleWords.length === 0)
+  }
 
-  words.forEach((word, index) => {
+  if (titleLettersGame) {
+    titleLettersGame.innerHTML = ""
+  }
+
+  if (verseLettersGame) {
+    verseLettersGame.innerHTML = ""
+  }
+
+  if (titleWords.length > 0 && titleLettersGame) {
+    renderLetterSection(titleWords, titleLettersGame, "title")
+  }
+
+  if (verseLettersGame) {
+    renderLetterSection(verseWords, verseLettersGame, "verse")
+  }
+
+  const firstBox =
+    document.querySelector('#titleLettersGame .letterBox:not(.isHidden)') ||
+    document.querySelector('#verseLettersGame .letterBox:not(.isHidden)')
+
+  if (firstBox) firstBox.focus()
+}
+
+function renderLetterSection(sourceWords, container, sectionType) {
+  sourceWords.forEach((word, index) => {
     const wrapper = document.createElement("span")
     wrapper.className = "letterWord"
 
@@ -400,8 +575,8 @@ function renderLettersGame() {
       plain.className = "fullWord"
       plain.textContent = word
       wrapper.appendChild(plain)
-      lettersGame.appendChild(wrapper)
-      lettersGame.appendChild(document.createTextNode(" "))
+      container.appendChild(wrapper)
+      container.appendChild(document.createTextNode(" "))
       return
     }
 
@@ -417,6 +592,7 @@ function renderLettersGame() {
     input.maxLength = 1
     input.className = "letterBox"
     input.dataset.index = String(index)
+    input.dataset.section = sectionType
     input.placeholder = "_"
 
     const fullWord = document.createElement("span")
@@ -456,41 +632,56 @@ function renderLettersGame() {
       wrapper.appendChild(trailSpan)
     }
 
-    lettersGame.appendChild(wrapper)
-    lettersGame.appendChild(document.createTextNode(" "))
+    container.appendChild(wrapper)
+    container.appendChild(document.createTextNode(" "))
   })
-
-  const firstBox = lettersGame.querySelector(".letterBox:not(.isHidden)")
-  if (firstBox) firstBox.focus()
 }
 
 function moveToNextLetterBox() {
-  const next = lettersGame.querySelector(".letterBox:not(.isHidden)")
+  const next =
+    document.querySelector('#titleLettersGame .letterBox:not(.isHidden)') ||
+    document.querySelector('#verseLettersGame .letterBox:not(.isHidden)')
+
   if (next) next.focus()
 }
 
 function checkTypeMode() {
-  const expectedWords = words
-    .map(word => normalize(word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "")))
-    .filter(Boolean)
+  const expectedTitleWords = titleWords.map(word => normalize(word)).filter(Boolean)
+  const expectedVerseWords = verseWords.map(word => normalize(word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, ""))).filter(Boolean)
 
-  const userWords = normalize(answer.value).split(" ").filter(Boolean)
+  const userTitleWords = normalize(titleAnswer ? titleAnswer.value : "").split(" ").filter(Boolean)
+  const userVerseWords = normalize(answer.value).split(" ").filter(Boolean)
 
-  let correct = 0
-  const total = expectedWords.length
+  let correctTitle = 0
+  let correctVerse = 0
 
-  for (let i = 0; i < total; i++) {
-    const expected = expectedWords[i] || ""
-    const user = userWords[i] || ""
-
-    if (user === expected) {
-      correct += 1
+  for (let i = 0; i < expectedTitleWords.length; i++) {
+    if ((userTitleWords[i] || "") === expectedTitleWords[i]) {
+      correctTitle += 1
     }
   }
 
+  for (let i = 0; i < expectedVerseWords.length; i++) {
+    if ((userVerseWords[i] || "") === expectedVerseWords[i]) {
+      correctVerse += 1
+    }
+  }
+
+  const total = expectedTitleWords.length + expectedVerseWords.length
+  const correct = correctTitle + correctVerse
   const percent = total === 0 ? 0 : Math.round((correct / total) * 100)
 
-  result.textContent = correct + "/" + total + " correct. " + percent + "%."
+  if (expectedTitleWords.length > 0) {
+    result.textContent =
+      "Title: " + correctTitle + "/" + expectedTitleWords.length +
+      ". Verse: " + correctVerse + "/" + expectedVerseWords.length +
+      ". Total: " + correct + "/" + total + ". " + percent + "%."
+  } else {
+    result.textContent =
+      "Verse: " + correctVerse + "/" + expectedVerseWords.length +
+      ". Total: " + correct + "/" + total + ". " + percent + "%."
+  }
+
   result.className = percent === 100 ? "result good" : "result bad"
 
   if (percent === 100) {
@@ -499,24 +690,39 @@ function checkTypeMode() {
 }
 
 function checkDragMode() {
-  if (!puzzleSlots || puzzleSlots.length === 0) {
-    result.textContent = "Start a drag game first."
-    result.className = "result bad"
-    return
-  }
+  let titleCorrect = 0
+  let titleFilled = 0
+  let titleTotal = titlePuzzleSlots.length
 
-  let correct = 0
-  let filled = 0
-
-  puzzleSlots.forEach(slot => {
-    if (slot.filled && slot.filled.trim() !== "") filled += 1
-    if (normalize(slot.filled || "") === normalize(slot.expected || "")) correct += 1
+  titlePuzzleSlots.forEach(slot => {
+    if (slot.filled && slot.filled.trim() !== "") titleFilled += 1
+    if (normalize(slot.filled || "") === normalize(slot.expected || "")) titleCorrect += 1
   })
 
-  const total = puzzleSlots.length
+  let verseCorrect = 0
+  let verseFilled = 0
+  let verseTotal = versePuzzleSlots.length
+
+  versePuzzleSlots.forEach(slot => {
+    if (slot.filled && slot.filled.trim() !== "") verseFilled += 1
+    if (normalize(slot.filled || "") === normalize(slot.expected || "")) verseCorrect += 1
+  })
+
+  const total = titleTotal + verseTotal
+  const correct = titleCorrect + verseCorrect
   const percent = total === 0 ? 0 : Math.round((correct / total) * 100)
 
-  result.textContent = filled + "/" + total + " filled. " + correct + "/" + total + " correct. " + percent + "%."
+  if (titleTotal > 0) {
+    result.textContent =
+      "Title: " + titleCorrect + "/" + titleTotal +
+      ". Verse: " + verseCorrect + "/" + verseTotal +
+      ". Total: " + correct + "/" + total + ". " + percent + "%."
+  } else {
+    result.textContent =
+      "Verse: " + verseCorrect + "/" + verseTotal +
+      ". Total: " + correct + "/" + total + ". " + percent + "%."
+  }
+
   result.className = percent === 100 ? "result good" : "result bad"
 
   if (percent === 100) {
@@ -525,42 +731,90 @@ function checkDragMode() {
 }
 
 function checkLettersGame() {
-  const wrappers = lettersGame.querySelectorAll(".letterWord")
+  let titleCorrect = 0
+  let titleTotal = 0
+  let verseCorrect = 0
+  let verseTotal = 0
 
-  let correct = 0
-  let total = 0
+  if (titleLettersGame) {
+    const titleWrappers = titleLettersGame.querySelectorAll(".letterWord")
 
-  wrappers.forEach(wrapper => {
-    const input = wrapper.querySelector(".letterBox")
-    const fullWord = wrapper.querySelector(".fullWord")
+    titleWrappers.forEach(wrapper => {
+      const input = wrapper.querySelector(".letterBox")
+      const fullWord = wrapper.querySelector(".fullWord")
 
-    if (!input || !fullWord) return
+      if (!input || !fullWord) return
 
-    total += 1
+      titleTotal += 1
 
-    if (!fullWord.classList.contains("isHidden")) {
-      correct += 1
-      return
-    }
+      if (!fullWord.classList.contains("isHidden")) {
+        titleCorrect += 1
+        return
+      }
 
-    const index = Number(input.dataset.index)
-    const cleanWord = words[index].replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "")
-    const expected = cleanWord.charAt(0).toLowerCase()
-    const user = input.value.trim().toLowerCase()
+      const index = Number(input.dataset.index)
+      const cleanWord = titleWords[index].replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "")
+      const expected = cleanWord.charAt(0).toLowerCase()
+      const user = input.value.trim().toLowerCase()
 
-    if (user === expected) {
-      correct += 1
-      input.classList.add("isHidden")
-      fullWord.classList.remove("isHidden")
-      input.classList.remove("wrong")
-    } else if (user) {
-      input.classList.add("wrong")
-    }
-  })
+      if (user === expected) {
+        titleCorrect += 1
+        input.classList.add("isHidden")
+        fullWord.classList.remove("isHidden")
+        input.classList.remove("wrong")
+      } else if (user) {
+        input.classList.add("wrong")
+      }
+    })
+  }
 
+  if (verseLettersGame) {
+    const verseWrappers = verseLettersGame.querySelectorAll(".letterWord")
+
+    verseWrappers.forEach(wrapper => {
+      const input = wrapper.querySelector(".letterBox")
+      const fullWord = wrapper.querySelector(".fullWord")
+
+      if (!input || !fullWord) return
+
+      verseTotal += 1
+
+      if (!fullWord.classList.contains("isHidden")) {
+        verseCorrect += 1
+        return
+      }
+
+      const index = Number(input.dataset.index)
+      const cleanWord = verseWords[index].replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "")
+      const expected = cleanWord.charAt(0).toLowerCase()
+      const user = input.value.trim().toLowerCase()
+
+      if (user === expected) {
+        verseCorrect += 1
+        input.classList.add("isHidden")
+        fullWord.classList.remove("isHidden")
+        input.classList.remove("wrong")
+      } else if (user) {
+        input.classList.add("wrong")
+      }
+    })
+  }
+
+  const total = titleTotal + verseTotal
+  const correct = titleCorrect + verseCorrect
   const percent = total === 0 ? 0 : Math.round((correct / total) * 100)
 
-  result.textContent = correct + "/" + total + " correct. " + percent + "%."
+  if (titleTotal > 0) {
+    result.textContent =
+      "Title: " + titleCorrect + "/" + titleTotal +
+      ". Verse: " + verseCorrect + "/" + verseTotal +
+      ". Total: " + correct + "/" + total + ". " + percent + "%."
+  } else {
+    result.textContent =
+      "Verse: " + verseCorrect + "/" + verseTotal +
+      ". Total: " + correct + "/" + total + ". " + percent + "%."
+  }
+
   result.className = percent === 100 ? "result good" : "result bad"
 
   if (percent === 100) {
@@ -583,34 +837,64 @@ function checkCurrentMode() {
 }
 
 function revealOneBlank() {
-  const empty = puzzleSlots.filter(slot => !slot.filled)
-  if (empty.length === 0) return
+  const emptyTitle = titlePuzzleSlots.filter(slot => !slot.filled)
+  const emptyVerse = versePuzzleSlots.filter(slot => !slot.filled)
 
-  const pick = empty[Math.floor(Math.random() * empty.length)]
-  pick.filled = pick.expected
-  selectedBankWord = ""
-  renderDragPuzzle()
+  if (emptyTitle.length > 0) {
+    const pick = emptyTitle[Math.floor(Math.random() * emptyTitle.length)]
+    pick.filled = pick.expected
+    selectedTitleBankWord = ""
+    renderDragPuzzle()
+    return
+  }
+
+  if (emptyVerse.length > 0) {
+    const pick = emptyVerse[Math.floor(Math.random() * emptyVerse.length)]
+    pick.filled = pick.expected
+    selectedVerseBankWord = ""
+    renderDragPuzzle()
+  }
 }
 
 function revealOneLetterBox() {
-  const wrappers = Array.from(lettersGame.querySelectorAll(".letterWord"))
-  const unfinished = wrappers.filter(wrapper => {
-    const input = wrapper.querySelector(".letterBox")
-    const fullWord = wrapper.querySelector(".fullWord")
-    return input && fullWord && fullWord.classList.contains("isHidden")
-  })
+  const titleUnfinished = titleLettersGame
+    ? Array.from(titleLettersGame.querySelectorAll(".letterWord")).filter(wrapper => {
+        const input = wrapper.querySelector(".letterBox")
+        const fullWord = wrapper.querySelector(".fullWord")
+        return input && fullWord && fullWord.classList.contains("isHidden")
+      })
+    : []
 
-  if (unfinished.length === 0) return
+  const verseUnfinished = verseLettersGame
+    ? Array.from(verseLettersGame.querySelectorAll(".letterWord")).filter(wrapper => {
+        const input = wrapper.querySelector(".letterBox")
+        const fullWord = wrapper.querySelector(".fullWord")
+        return input && fullWord && fullWord.classList.contains("isHidden")
+      })
+    : []
 
-  const pick = unfinished[Math.floor(Math.random() * unfinished.length)]
-  const input = pick.querySelector(".letterBox")
-  const fullWord = pick.querySelector(".fullWord")
+  if (titleUnfinished.length > 0) {
+    const pick = titleUnfinished[Math.floor(Math.random() * titleUnfinished.length)]
+    const input = pick.querySelector(".letterBox")
+    const fullWord = pick.querySelector(".fullWord")
 
-  input.classList.add("isHidden")
-  fullWord.classList.remove("isHidden")
-  input.classList.remove("wrong")
+    input.classList.add("isHidden")
+    fullWord.classList.remove("isHidden")
+    input.classList.remove("wrong")
+    moveToNextLetterBox()
+    return
+  }
 
-  moveToNextLetterBox()
+  if (verseUnfinished.length > 0) {
+    const pick = verseUnfinished[Math.floor(Math.random() * verseUnfinished.length)]
+    const input = pick.querySelector(".letterBox")
+    const fullWord = pick.querySelector(".fullWord")
+
+    input.classList.add("isHidden")
+    fullWord.classList.remove("isHidden")
+    input.classList.remove("wrong")
+    moveToNextLetterBox()
+  }
 }
 
 function giveHint() {
@@ -656,6 +940,10 @@ function updatePracticeUI() {
   btnHideAll.classList.toggle("isHidden", isDrag || isLetters)
 
   answerRow.classList.toggle("isHidden", isDrag || isLetters)
+
+  if (titleAnswerRow) {
+    titleAnswerRow.classList.toggle("isHidden", isDrag || isLetters || titleWords.length === 0)
+  }
 }
 
 function applyModeUI() {
@@ -725,6 +1013,11 @@ function openGamePicker(verseId) {
   gameRef.textContent = verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref
   gameVerse.textContent = verse.text
 
+  if (gameMemoryTitle) {
+    gameMemoryTitle.textContent = verse.title ? verse.title : ""
+    gameMemoryTitle.classList.toggle("isHidden", !verse.title)
+  }
+
   showPage("game")
 }
 
@@ -752,7 +1045,9 @@ function renderLibrary() {
     meta.className = "meta"
 
     const title = document.createElement("div")
-    title.textContent = verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref
+    title.textContent = verse.title
+      ? verse.title + " • " + (verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref)
+      : (verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref)
 
     const preview = document.createElement("small")
     preview.textContent = verse.text.slice(0, 80) + (verse.text.length > 80 ? "..." : "")
@@ -835,6 +1130,7 @@ function confirmDelete(id, row) {
 }
 
 function saveNewVerse() {
+  const title = newTitle.value.trim()
   const ref = newRef.value.trim()
   const version = newVersion.value.trim()
   const text = newText.value.trim()
@@ -847,6 +1143,7 @@ function saveNewVerse() {
   const custom = getCustomVerses()
   const item = {
     id: "custom_" + Date.now(),
+    title,
     ref,
     version,
     text
@@ -861,6 +1158,7 @@ function saveNewVerse() {
 
   manageMsg.textContent = "Saved."
   pasteBox.value = ""
+  newTitle.value = ""
   newRef.value = ""
   newVersion.value = ""
   newText.value = ""
@@ -874,9 +1172,8 @@ function deleteCustomVerse(id) {
   refreshVerses()
 
   if (verses.length === 0) {
-    verseSelect.innerHTML = ""
     setPracticeEnabled(false)
-    refText.textContent = "No verses yet"
+    practiceVerseTitle.textContent = "No verses yet"
     verseText.textContent = "Go to Library to add one."
     setTypingEnabled(false)
     renderLibrary()
@@ -885,19 +1182,15 @@ function deleteCustomVerse(id) {
     return
   }
 
-  const currentSelected = verseSelect.value
-  const stillExists = verses.some(v => v.id === currentSelected)
+  const stillExists = verses.some(v => v.id === selectedVerseId)
+  const nextId = stillExists ? selectedVerseId : verses[0].id
 
-  rebuildDropdown(stillExists ? currentSelected : verses[0].id)
+  rebuildDropdown(nextId)
 
   renderLibrary()
   manageMsg.textContent = "Deleted."
   showPage("library")
 }
-
-verseSelect.addEventListener("change", event => {
-  loadVerse(event.target.value)
-})
 
 function autoFillFromPastedText() {
   const raw = (pasteBox.value || "").trim()
@@ -1012,6 +1305,6 @@ themeSelect.addEventListener("change", event => {
 
 initTheme()
 showPage("library")
-loadVerses()
+refreshVerses()
 loadStats()
 

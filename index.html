@@ -32,17 +32,35 @@
 
                 <div class="row">
                     <label>Verse</label>
-                    <select id="verseSelect"></select>
+                    <div class="ref" id="practiceVerseTitle"></div>
                 </div>
 
-                <div class="ref" id="refText"></div>
+                <div class="ref" id="practiceTitle"></div>
+
                 <div class="verse" id="verseText"></div>
 
-                <div id="lettersGame" class="verse isHidden"></div>
+                <div id="lettersGame" class="isHidden">
+                    <div id="titleLettersSection" class="verse isHidden">
+                        <label>Title</label>
+                        <div id="titleLettersGame"></div>
+                    </div>
+
+                    <div class="verse">
+                        <label>Verse</label>
+                        <div id="verseLettersGame"></div>
+                    </div>
+                </div>
 
                 <div id="dragGame" class="isHidden">
+                    <div id="titleDragSection" class="isHidden">
+                        <label>Title</label>
+                        <div class="verse" id="titleBlankLine"></div>
+                        <div id="titleWordBank" class="controls"></div>
+                        <hr class="sep">
+                    </div>
+
+                    <label>Verse</label>
                     <div class="verse" id="blankLine"></div>
-                    <hr class="sep">
                     <div id="wordBank" class="controls"></div>
                 </div>
 
@@ -51,6 +69,11 @@
                 </div>
 
                 <hr class="sep">
+
+                <div class="row isHidden" id="titleAnswerRow">
+                    <label>Type Title from Memory</label>
+                    <input id="titleAnswer" type="text" placeholder="Type title here.">
+                </div>
 
                 <div class="row" id="answerRow">
                     <label>Type from Memory</label>
@@ -93,6 +116,11 @@
                 </div>
 
                 <div class="row">
+                    <label for="newTitle">Title (optional)</label>
+                    <input id="newTitle" type="text" placeholder="Example: God's Faithfulness">
+                </div>
+
+                <div class="row">
                     <label>Reference</label>
                     <input id="newRef">
                 </div>
@@ -128,6 +156,9 @@
                 <h2 id="gameTitle">Choose a game</h2>
 
                 <div class="ref" id="gameRef"></div>
+
+                <div class="ref" id="gameMemoryTitle"></div>
+
                 <div class="verse" id="gameVerse"></div>
 
                 <div class="controls">

@@ -404,3 +404,17 @@ textarea:disabled {
     height: 40px;
   }
 }
+
+#practiceTitle,
+#gameMemoryTitle {
+  font-size: 16px;
+  margin-top: -4px;
+}
+
+#titleLettersGame,
+#verseLettersGame {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  line-height: 1.8;
+}

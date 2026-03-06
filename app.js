@@ -41,18 +41,24 @@ const dragGame = document.getElementById("dragGame")
 const blankLine = document.getElementById("blankLine")
 const wordBank = document.getElementById("wordBank")
 
-const btnRevealOne = document.getElementById("btnRevealOne")
-const btnHideMore = document.getElementById("btnHideMore")
 const btnHideAll = document.getElementById("btnHideAll")
 const btnReset = document.getElementById("btnReset")
 const btnGiveHint = document.getElementById("btnGiveHint")
 const btnCheck = document.getElementById("btnCheck")
+
+const pasteBox = document.getElementById("pasteBox")
+const btnAutoFill = document.getElementById("btnAutoFill")
 
 const newRef = document.getElementById("newRef")
 const newText = document.getElementById("newText")
 const manageMsg = document.getElementById("ManageMsg")
 const btnSaveVerse = document.getElementById("btnSaveVerse")
 const libraryGrid = document.getElementById("libraryGrid")
+
+const themeSelect = document.getElementById("themeSelect")
+const settingsMsg = document.getElementById("settingsMsg")
+const newVersion = document.getElementById("newVersion")
+const btnBackToGame = document.getElementById("btnBackToGame")
 
 function getCustomVerses() {
   const raw = localStorage.getItem("customVerses")
@@ -88,8 +94,6 @@ function setTypingEnabled(enabled) {
 }
 
 function setPracticeEnabled(enabled) {
-  btnRevealOne.disabled = !enabled
-  btnHideMore.disabled = !enabled
   btnHideAll.disabled = !enabled
   btnReset.disabled = !enabled
   btnCheck.disabled = !enabled
@@ -114,12 +118,32 @@ function saveScore() {
   stats.textContent = "Verses memorized: " + count
 }
 
+function getSavedTheme() {
+  return localStorage.getItem("memoryTheme") || "sepia"
+}
+
+function applyTheme(theme) {
+  document.body.setAttribute("data-theme", theme)
+  if (themeSelect) themeSelect.value = theme
+}
+
+function saveTheme(theme) {
+  localStorage.setItem("memoryTheme", theme)
+  applyTheme(theme)
+  settingsMsg.textContent = "Theme saved."
+}
+
+function initTheme() {
+  const theme = getSavedTheme()
+  applyTheme(theme)
+}
+
 function loadVerse(id) {
   const verse = verses.find(v => v.id === id)
   if (!verse) return
 
   selectedVerseId = id
-  refText.textContent = verse.ref
+  refText.textContent = verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref
   words = verse.text.split(" ")
   hiddenIndexes = []
   puzzleHidden = []
@@ -629,8 +653,6 @@ function updatePracticeUI() {
   dragGame.classList.toggle("isHidden", !isDrag)
   lettersGame.classList.toggle("isHidden", !isLetters)
 
-  btnRevealOne.classList.toggle("isHidden", isDrag || isLetters)
-  btnHideMore.classList.toggle("isHidden", isDrag || isLetters)
   btnHideAll.classList.toggle("isHidden", isDrag || isLetters)
 
   answerRow.classList.toggle("isHidden", isDrag || isLetters)
@@ -700,7 +722,7 @@ function openGamePicker(verseId) {
 
   selectedVerseId = verseId
   gameTitle.textContent = "Choose a game"
-  gameRef.textContent = verse.ref
+  gameRef.textContent = verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref
   gameVerse.textContent = verse.text
 
   showPage("game")
@@ -730,7 +752,7 @@ function renderLibrary() {
     meta.className = "meta"
 
     const title = document.createElement("div")
-    title.textContent = verse.ref
+    title.textContent = verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref
 
     const preview = document.createElement("small")
     preview.textContent = verse.text.slice(0, 80) + (verse.text.length > 80 ? "..." : "")
@@ -789,22 +811,60 @@ function confirmDelete(id, row) {
   yes.type = "button"
   yes.className = "danger"
   yes.textContent = "Delete"
-  yes.addEventListener("click", () => deleteCustomVerse(id))
+  yes.addEventListener("click", (event) => {
+    event.stopPropagation()
+    deleteCustomVerse(id)
+  })
 
   const no = document.createElement("button")
   no.type = "button"
   no.className = "ghost"
   no.textContent = "Cancel"
-  no.addEventListener("click", renderLibrary)
+  no.addEventListener("click", (event) => {
+    event.stopPropagation()
+    showPage("library")
+  })
 
   const actions = document.createElement("div")
   actions.className = "controls"
-
   actions.appendChild(yes)
   actions.appendChild(no)
 
   row.appendChild(meta)
   row.appendChild(actions)
+}
+
+function saveNewVerse() {
+  const ref = newRef.value.trim()
+  const version = newVersion.value.trim()
+  const text = newText.value.trim()
+
+  if (!ref || !text) {
+    manageMsg.textContent = "Please fill in version, reference and verse text."
+    return
+  }
+
+  const custom = getCustomVerses()
+  const item = {
+    id: "custom_" + Date.now(),
+    ref,
+    version,
+    text
+  }
+
+  custom.unshift(item)
+  setCustomVerses(custom)
+
+  refreshVerses()
+  rebuildDropdown(item.id)
+  renderLibrary()
+
+  manageMsg.textContent = "Saved."
+  pasteBox.value = ""
+  newRef.value = ""
+  newVersion.value = ""
+  newText.value = ""
+  pasteBox.focus()
 }
 
 function deleteCustomVerse(id) {
@@ -821,56 +881,96 @@ function deleteCustomVerse(id) {
     setTypingEnabled(false)
     renderLibrary()
     manageMsg.textContent = "Deleted."
+    showPage("library")
     return
   }
 
   const currentSelected = verseSelect.value
-  const stillExists = verses.some(verse => verse.id === currentSelected)
+  const stillExists = verses.some(v => v.id === currentSelected)
 
   rebuildDropdown(stillExists ? currentSelected : verses[0].id)
+
   renderLibrary()
   manageMsg.textContent = "Deleted."
-}
-
-function saveNewVerse() {
-  const ref = newRef.value.trim()
-  const text = newText.value.trim()
-
-  if (!ref || !text) {
-    manageMsg.textContent = "Please fill in reference and verse text."
-    return
-  }
-
-  const custom = getCustomVerses()
-  const item = {
-    id: "custom_" + Date.now(),
-    ref,
-    text
-  }
-
-  custom.unshift(item)
-  setCustomVerses(custom)
-
-  refreshVerses()
-  rebuildDropdown(item.id)
-  renderLibrary()
-
-  manageMsg.textContent = "Saved."
-  newRef.value = ""
-  newText.value = ""
-  newRef.focus()
+  showPage("library")
 }
 
 verseSelect.addEventListener("change", event => {
   loadVerse(event.target.value)
 })
 
-btnRevealOne.addEventListener("click", revealOneWord)
-btnHideMore.addEventListener("click", hideRandomWord)
+function autoFillFromPastedText() {
+  const raw = (pasteBox.value || "").trim()
+
+  if (!raw) {
+    manageMsg.textContent = "Please paste the YouVersion text first."
+    return
+  }
+
+  const lines = raw
+    .split("\n")
+    .map(line => line.trim())
+    .filter(line => line !== "")
+
+  if (lines.length === 0) {
+    manageMsg.textContent = "Nothing to parse."
+    return
+  }
+
+  const urlPattern = /^https?:\/\/\S+$/i
+  const filteredLines = lines.filter(line => !urlPattern.test(line))
+
+  if (filteredLines.length === 0) {
+    manageMsg.textContent = "Could not find verse text."
+    return
+  }
+
+  let referenceLine = ""
+  let verseLines = filteredLines.slice()
+
+  if (filteredLines.length >= 2) {
+    referenceLine = filteredLines[filteredLines.length - 1]
+    verseLines = filteredLines.slice(0, -1)
+  }
+
+  const verseTextOnly = verseLines.join(" ").trim()
+
+  const cleanedVerseText = verseTextOnly
+    .replace(/^['"“”‘’]+\s*/, "")
+    .replace(/\s*['"“”‘’]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  let version = ""
+
+  const urlLine = lines.find(line => line.includes("bible.com"))
+
+  if (urlLine) {
+    const match = urlLine.match(/\.([A-Z0-9]+)$/i)
+
+    if (match) {
+      version = match[1].toUpperCase()
+    }
+  }
+
+  newRef.value = referenceLine
+  newVersion.value = version
+  newText.value = cleanedVerseText
+
+  manageMsg.textContent = "Auto filled."
+}
+
+btnBackToGame.addEventListener("click", () => {
+  openGamePicker(selectedVerseId)
+})
+
 btnHideAll.addEventListener("click", toggleHideAll)
 btnReset.addEventListener("click", resetCurrentGame)
 btnGiveHint.addEventListener("click", giveHint)
 btnCheck.addEventListener("click", checkCurrentMode)
+
+
+btnAutoFill.addEventListener("click", autoFillFromPastedText)
 
 btnSaveVerse.addEventListener("click", saveNewVerse)
 btnBackToLibrary.addEventListener("click", () => showPage("library"))
@@ -882,6 +982,16 @@ modeType.addEventListener("click", () => startSelectedGame("type"))
 modeDrag.addEventListener("click", () => startSelectedGame("drag"))
 modeLetters.addEventListener("click", () => startSelectedGame("letters"))
 
+pasteBox.addEventListener("paste", () => {
+  setTimeout(autoFillFromPastedText, 0)
+})
+
+themeSelect.addEventListener("change", event => {
+  saveTheme(event.target.value)
+})
+
+initTheme()
 showPage("library")
 loadVerses()
 loadStats()
+

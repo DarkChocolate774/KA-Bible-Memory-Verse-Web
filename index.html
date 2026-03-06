@@ -1,130 +1,187 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
-  <title>Scripture Memory</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Scripture Memory</title>
 </head>
-<body>
-  <main class="wrap">
-    <header class="top">
-      <h1>Scripture Memory</h1>
-      <p class="sub">Pick a verse. Choose a game. Memorize step by step.</p>
 
-      <div class="tabs">
-        <button id="tabLibrary" class="tab" type="button">Library</button>
-        <button id="tabSettings" class="tab" type="button">Settings</button>
-      </div>
-    </header>
+<body data-theme="sepia">
 
-    <section id="pagePractice" class="isHidden">
-      <section class="card">
-        <div class="row">
-          <label for="verseSelect">Verse</label>
-          <select id="verseSelect"></select>
-        </div>
+    <main class="wrap">
 
-        <div class="ref" id="refText"></div>
-        <div class="verse" id="verseText"></div>
+        <header class="top">
+            <h1>Scripture Memory</h1>
+            <p class="sub">Pick a verse. Choose a game. Memorize step by step.</p>
 
-        <div id="lettersGame" class="verse isHidden"></div>
+            <br>
 
-        <div id="dragGame" class="isHidden">
-          <div class="verse" id="blankLine"></div>
+            <div class="tabs">
+                <button id="tabLibrary" class="tab">Library</button>
+                <button id="tabSettings" class="tab">Settings</button>
+            </div>
+        </header>
 
-          <hr class="sep">
+        <br>
 
-          <div id="wordBank" class="controls"></div>
-        </div>
+        <section id="pagePractice" class="isHidden">
 
-        <div class="controls" id="modeButtonsRow">
-          <button id="btnRevealOne" type="button">Reveal 1 word</button>
-          <button id="btnHideMore" type="button">Hide more</button>
-          <button id="btnHideAll" type="button">Hide All</button>
-        </div>
+            <section class="card">
 
-        <hr class="sep">
+                <div class="row">
+                    <label>Verse</label>
+                    <select id="verseSelect"></select>
+                </div>
 
-        <div class="row" id="answerRow">
-          <label for="answer">Type from Memory</label>
-          <textarea id="answer" rows="4" placeholder="Hide words first to type." disabled></textarea>
-        </div>
+                <div class="ref" id="refText"></div>
+                <div class="verse" id="verseText"></div>
 
-        <div class="controls">
-          <button id="btnReset" type="button">Reset</button>
-          <button id="btnGiveHint" type="button">Hint</button>
-          <button id="btnCheck" type="button">Check</button>
-        </div>
+                <div id="lettersGame" class="verse isHidden"></div>
 
-        <div class="result" id="result"></div>
-        <div class="stats" id="stats"></div>
-      </section>
-    </section>
+                <div id="dragGame" class="isHidden">
+                    <div class="verse" id="blankLine"></div>
+                    <hr class="sep">
+                    <div id="wordBank" class="controls"></div>
+                </div>
 
-    <section id="pageLibrary">
-      <section class="card">
-        <h2>Library</h2>
+                <div class="controls">
+                    <button id="btnHideAll">Reveal All</button>
+                </div>
 
-        <div id="managePanel" class="panel">
-          <div class="row">
-            <label for="newRef">Reference</label>
-            <input id="newRef" type="text" placeholder="Example: Romans 8:28">
-          </div>
+                <hr class="sep">
 
-          <div class="row">
-            <label for="newText">Verse text</label>
-            <textarea id="newText" rows="4" placeholder="Paste the verse text here."></textarea>
-          </div>
+                <div class="row" id="answerRow">
+                    <label>Type from Memory</label>
+                    <textarea id="answer" rows="4"></textarea>
+                </div>
 
-          <div class="controls">
-            <button id="btnSaveVerse" type="button">Save Verse</button>
-          </div>
+                <div class="controls">
+                    <button id="btnReset">Reset</button>
+                    <button id="btnGiveHint">Hint</button>
+                    <button id="btnCheck">Check</button>
+                </div>
 
-          <div class="result" id="ManageMsg"></div>
+                <div class="result" id="result"></div>
+                <div class="stats" id="stats"></div>
 
-          <hr class="sep">
+                <div class="controls">
+                    <button id="btnBackToGame">Back</button>
+                </div>
 
-          <div class="row">
-            <label>Your library</label>
-            <div id="libraryGrid"></div>
-          </div>
-        </div>
-      </section>
-    </section>
+            </section>
+        </section>
 
-    <section id="pageGame" class="isHidden">
-      <section class="card">
-        <h2 id="gameTitle">Choose a game</h2>
-        <div class="ref" id="gameRef"></div>
-        <div class="verse" id="gameVerse"></div>
 
-        <div class="controls">
-          <button id="modeType" type="button">Type from memory</button>
-          <button id="modeDrag" type="button">Drag and drop blanks</button>
-          <button id="modeLetters" type="button">First letter mode</button>
-        </div>
 
-        <hr class="sep">
+        <section id="pageLibrary">
 
-        <div class="controls">
-          <button id="btnBackToLibrary" type="button">Back</button>
-        </div>
-      </section>
-    </section>
+            <section class="card">
 
-    <section id="pageSettings" class="isHidden">
-      <section class="card">
-        <h2>Settings</h2>
-        <p>App settings will go here.</p>
-      </section>
-    </section>
+                <h2>Library</h2>
 
-    <footer class="foot">
-      <small>Saved in your browser. No LogIn.</small>
-    </footer>
-  </main>
+                <div class="row">
+                    <label for="pasteBox">Paste from YouVersion</label>
+                    <textarea id="pasteBox" rows="6"
+                        placeholder="Paste copied verse text, reference, and link from YouVersion here">
+                    </textarea>
+                </div>
 
-  <script src="app.js"></script>
+                <div class="controls">
+                    <button id="btnAutoFill" type="button">Auto Fill</button>
+                </div>
+
+                <div class="row">
+                    <label>Reference</label>
+                    <input id="newRef">
+                </div>
+
+                <div class="row">
+                    <label for="newVersion">Version</label>
+                    <input id="newVersion" type="text" placeholder="Example: NLT">
+                </div>
+
+                <div class="row">
+                    <label>Verse text</label>
+                    <textarea id="newText" rows="4"></textarea>
+                </div>
+
+                <div class="controls">
+                    <button id="btnSaveVerse">Save Verse</button>
+                </div>
+
+                <div class="result" id="ManageMsg"></div>
+
+                <hr class="sep">
+
+                <div id="libraryGrid"></div>
+
+            </section>
+
+        </section>
+
+        <section id="pageGame" class="isHidden">
+
+            <section class="card">
+
+                <h2 id="gameTitle">Choose a game</h2>
+
+                <div class="ref" id="gameRef"></div>
+                <div class="verse" id="gameVerse"></div>
+
+                <div class="controls">
+                    <button id="modeType">Type from memory</button>
+                    <button id="modeDrag">Drag and drop blanks</button>
+                    <button id="modeLetters">First letter mode</button>
+                </div>
+
+                <hr class="sep">
+
+                <div class="controls">
+                    <button id="btnBackToLibrary">Back</button>
+                </div>
+
+            </section>
+
+        </section>
+
+
+
+        <section id="pageSettings" class="isHidden">
+
+            <section class="card">
+
+                <h2>Settings</h2>
+
+                <div class="row">
+                    <label>Color Theme</label>
+
+                    <select id="themeSelect">
+
+                        <option value="sepia" selected>Sepia Light</option>
+                        <option value="white">Classic White</option>
+                        <option value="warm">Warm Brown</option>
+                        <option value="night">Night Blue</option>
+                        <option value="forest">Forest Green</option>
+                    </select>
+                </div>
+
+                <div class="result" id="settingsMsg">Theme saved in this browser.</div>
+            </section>
+
+        </section>
+
+
+
+        <footer class="foot">
+            Saved in your browser
+        </footer>
+
+    </main>
+
+    <script src="app.js"></script>
+
 </body>
+
 </html>

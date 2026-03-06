@@ -1,103 +1,133 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <title>Scripture Memory</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <title>Scripture Memory</title>
 </head>
 <body>
-    <main class="wrap">
-        <header class="top">
-            <h1>Scripture Memory</h1>
-            <p class="sub">Pick a verse. Hide words. Type it out. </p>
-            <div class="tabs">
-                <button id="tabPractice" type="button" class="tab active">Practice</button>
-                <button id="tabLibrary" type="button" class="tab">Library</button>
-                <button id="tabSettings" type="button" class="tab">Settings</button>
-            </div>
-        </header>
+  <main class="wrap">
+    <header class="top">
+      <h1>Scripture Memory</h1>
+      <p class="sub">Pick a verse. Choose a game. Memorize step by step.</p>
 
-        <br>
+      <div class="tabs">
+        <button id="tabLibrary" class="tab">Library</button>
+        <button id="tabSettings" class="tab">Settings</button>
+      </div>
+    </header>
 
-        <section id="pagePractice">
-            <section class="card">
-                <div class="row">
-                    <label for="verseSelect">Verse</label>
-                    <select id="verseSelect"></select>
-                </div>
+    <br>
 
-                <div class="ref" id="refText"></div>
+    <section id="pagePractice" class="isHidden">
+      <section class="card">
+        <div class="row">
+          <label for="verseSelect">Verse</label>
+          <select id="verseSelect"></select>
+        </div>
 
-                <div class="verse" id="verseText" aria-live="polite"></div>
+        <div class="ref" id="refText"></div>
 
-                <div class="controls">
-                    <button id="btnRevealOne" type="button">Reveal 1 word</button>
-                    <button id="btnHideMore" type="button">Hide more</button>
-                    <button id="btnHideAll" type="button">Hide All</button>
-                    <button id="btnReset" type="button">Reset</button>
-                </div>
+        <div class="verse" id="verseText"></div>
 
-                <hr class="sep" />
+        <div id="lettersGame" class="verseisHidden"></div>
 
-                <div class="row">
-                    <label for="answer">Type from Memory</label>
-                    <textarea id="answer" rows="4" placeholder="Hide words first to type." disabled></textarea>
-                </div>
+        <div id="dragGame" class="isHidden">
+          <div class="verse" id="blankLine"></div>
 
-                <div class="controls"> <button id="btnCheck" type="button">Check</button> <button id="btnGiveHint" type="button">Hint</button> </div>
+          <hr class="sep">
 
-                <div class="result" id="result"></div>
-                <div class="stats" id="stats"></div>
-            </section>
-        </section>
+          <div id="wordBank" class="controls"></div>
+        </div>
 
-        <section id="pageLibrary" class="isHidden">
-            <section class="card">
-                <h2>Library</h2>
+        <div class="controls" id="modeButtonsRow">
+          <button id="btnRevealOne" type="button">Reveal 1 word</button>
+          <button id="btnHideMore" type="button">Hide more</button>
+          <button id="btnHideAll" type="button">Hide All</button>
+        </div>
 
-                <div id="managePanel" class="panel">
-                    <div class="row">
-                        <label for="newRef">Reference</label>
-                        <input id="newRef" type="text" placeholder="Example: Romans 8:28">
-                    </div>
+        <hr class="sep">
 
-                    <div class="row">
-                        <label for="newText">Verse text</label>
-                        <textarea id="newText" rows="4" placeholder="paste the verse text here."></textarea>
-                    </div>
-                    
+        <div class="row" id="answerRow">
+          <label for="answer">Type from Memory</label>
+          <textarea id="answer" rows="4" placeholder="Hide words first to type." disabled></textarea>
+        </div>
 
-                    <div class="controls">
-                        <button id="btnSaveVerse" type="button">Save Verse</button>
-                        <button id="btnCloseManage" type="button">Back to Practice</button>
-                    </div>
+        <div class="controls">
+          <button id="btnReset" type="button">Reset</button>
+          <button id="btnGiveHint" type="button">Hint</button>
+          <button id="btnCheck" type="button">Check</button>
+        </div>
 
-                    <div class="result" id="ManageMsg"></div>
+        <div class="result" id="result"></div>
+        <div class="stats" id="stats"></div>
+      </section>
+    </section>
 
-                    <hr class="sep" />
+    <section id="pageLibrary">
+      <section class="card">
+        <h2>Library</h2>
 
-                    <div class="row">
-                        <label>Your saved verses</label>
-                        <div id="customList"></div>
-                    </div>
-                </div>
-            </section>
-        </section>
+        <div id="managePanel" class="panel">
+          <div class="row">
+            <label for="newRef">Reference</label>
+            <input id="newRef" type="text" placeholder="Example: Romans 8:28">
+          </div>
 
-        <section id="pageSettings" class="isHidden">
-            <section class="card">
-                <h2>Settings</h2>
-                <p>App Settings will go here.</p>
-            </section>
-        </section>
+          <div class="row">
+            <label for="newText">Verse text</label>
+            <textarea id="newText" rows="4" placeholder="Paste the verse text here."></textarea>
+          </div>
 
-        <footer class="foot">
-            <small>Saved in your browser. No LogIn.</small>
-        </footer>
-    </main>
+          <div class="controls">
+            <button id="btnSaveVerse" type="button">Save Verse</button>
+          </div>
 
-    <script src="app.js"></script>
+          <div class="result" id="ManageMsg"></div>
 
+          <hr class="sep">
+
+          <div class="row">
+            <label>Your library</label>
+            <div id="libraryGrid"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="pageGame" class="isHidden">
+      <section class="card">
+        <h2 id="gameTitle">Choose a game</h2>
+        <div class="ref" id="gameRef"></div>
+        <div class="verse" id="gameVerse"></div>
+
+        <div class="controls">
+          <button id="modeType" type="button">Type from memory</button>
+          <button id="modeDrag" type="button">Drag and drop blanks</button>
+          <button id="modeLetters" type="button">First letter mode</button>
+        </div>
+
+        <hr class="sep">
+
+        <div class="controls">
+          <button id="btnBackToLibrary" type="button">Back</button>
+        </div>
+      </section>
+    </section>
+
+    <section id="pageSettings" class="isHidden">
+      <section class="card">
+        <h2>Settings</h2>
+        <p>App settings will go here.</p>
+      </section>
+    </section>
+
+    <footer class="foot">
+      <small>Saved in your browser. No LogIn.</small>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
 </body>
 </html>

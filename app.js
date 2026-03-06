@@ -9,6 +9,7 @@ let currentMode = "type"
 
 let puzzleHidden = []
 let puzzleSlots = []
+let selectedBankWord = ""
 
 const pagePractice = document.getElementById("pagePractice")
 const pageLibrary = document.getElementById("pageLibrary")
@@ -20,6 +21,7 @@ const tabSettings = document.getElementById("tabSettings")
 
 const gameTitle = document.getElementById("gameTitle")
 const gameRef = document.getElementById("gameRef")
+const gameVerse = document.getElementById("gameVerse")
 
 const modeType = document.getElementById("modeType")
 const modeDrag = document.getElementById("modeDrag")
@@ -51,7 +53,6 @@ const newText = document.getElementById("newText")
 const manageMsg = document.getElementById("ManageMsg")
 const btnSaveVerse = document.getElementById("btnSaveVerse")
 const libraryGrid = document.getElementById("libraryGrid")
-const gameVerse = document.getElementById("gameVerse")
 
 function getCustomVerses() {
   const raw = localStorage.getItem("customVerses")
@@ -60,7 +61,7 @@ function getCustomVerses() {
   try {
     const data = JSON.parse(raw)
     return Array.isArray(data) ? data : []
-  } catch (e) {
+  } catch (error) {
     return []
   }
 }
@@ -74,7 +75,7 @@ function refreshVerses() {
 }
 
 function normalize(text) {
-  return text
+  return String(text || "")
     .toLowerCase()
     .replace(/[.,!?;:"'’“”()[\]{}]/g, "")
     .replace(/\s+/g, " ")
@@ -102,7 +103,7 @@ function setPracticeEnabled(enabled) {
 }
 
 function loadStats() {
-  const count = localStorage.getItem("memoryScore") || 0
+  const count = localStorage.getItem("memoryScore") || "0"
   stats.textContent = "Verses memorized: " + count
 }
 
@@ -117,9 +118,13 @@ function loadVerse(id) {
   const verse = verses.find(v => v.id === id)
   if (!verse) return
 
+  selectedVerseId = id
   refText.textContent = verse.ref
   words = verse.text.split(" ")
   hiddenIndexes = []
+  puzzleHidden = []
+  puzzleSlots = []
+  selectedBankWord = ""
 
   renderVerse()
   answer.value = ""
@@ -168,7 +173,7 @@ function rebuildDropdown(selectedId) {
     verseSelect.appendChild(option)
   })
 
-  const idToLoad = selectedId || verses[0].id
+  const idToLoad = selectedId && verses.some(v => v.id === selectedId) ? selectedId : verses[0].id
   verseSelect.value = idToLoad
   setPracticeEnabled(true)
   loadVerse(idToLoad)
@@ -179,11 +184,11 @@ function renderVerse() {
 
   words.forEach((word, index) => {
     const span = document.createElement("span")
-    span.classList.add("token")
+    span.className = "token"
 
     if (hiddenIndexes.includes(index)) {
       span.classList.add("hidden")
-      span.textContent = "__".repeat(word.length)
+      span.textContent = "__".repeat(Math.max(1, word.length))
     } else {
       span.textContent = word
     }
@@ -194,7 +199,7 @@ function renderVerse() {
 }
 
 function hideRandomWord() {
-  const visible = words.map((w, i) => i).filter(i => !hiddenIndexes.includes(i))
+  const visible = words.map((word, index) => index).filter(index => !hiddenIndexes.includes(index))
   if (visible.length === 0) return
 
   const randomIndex = visible[Math.floor(Math.random() * visible.length)]
@@ -212,7 +217,7 @@ function revealOneWord() {
 }
 
 function hideAllWords() {
-  hiddenIndexes = words.map((w, i) => i)
+  hiddenIndexes = words.map((word, index) => index)
   renderVerse()
   setTypingEnabled(true)
   answer.focus()
@@ -227,15 +232,15 @@ function revealAllWords() {
 function toggleHideAll() {
   if (hiddenIndexes.length === words.length) {
     revealAllWords()
-    btnHideAll.textContent = "Hide all"
+    btnHideAll.textContent = "Hide All"
   } else {
     hideAllWords()
-    btnHideAll.textContent = "Reveal all"
+    btnHideAll.textContent = "Reveal All"
   }
 }
 
 function resetTypeMode() {
-  hiddenIndexes = words.map((w, i) => i)
+  hiddenIndexes = words.map((word, index) => index)
   renderVerse()
   setTypingEnabled(true)
   answer.value = ""
@@ -247,18 +252,22 @@ function resetTypeMode() {
 function buildDragPuzzle() {
   const rawHideCount = Math.floor(words.length * 0.25)
   const hideCount = Math.max(1, Math.min(5, rawHideCount || 1))
-  puzzleHidden = []
 
-  const indexes = words.map((w, i) => i)
+  puzzleHidden = []
+  selectedBankWord = ""
+
+  const indexes = words.map((word, index) => index)
 
   while (puzzleHidden.length < hideCount && indexes.length > 0) {
-    const r = Math.floor(Math.random() * indexes.length)
-    puzzleHidden.push(indexes.splice(r, 1)[0])
+    const randomPos = Math.floor(Math.random() * indexes.length)
+    puzzleHidden.push(indexes.splice(randomPos, 1)[0])
   }
 
-  puzzleSlots = puzzleHidden.map(i => ({
-    index: i,
-    expected: words[i],
+  puzzleHidden.sort((a, b) => a - b)
+
+  puzzleSlots = puzzleHidden.map(index => ({
+    index,
+    expected: words[index],
     filled: ""
   }))
 
@@ -279,19 +288,28 @@ function renderDragPuzzle() {
       blank.textContent = slot && slot.filled ? slot.filled : "_____"
       blank.className = slot && slot.filled ? "blank filled" : "blank"
 
-      blank.addEventListener("dragover", e => {
-        e.preventDefault()
+      blank.addEventListener("dragover", event => {
+        event.preventDefault()
       })
 
-      blank.addEventListener("drop", e => {
-        e.preventDefault()
-        const word = e.dataTransfer.getData("text/plain")
+      blank.addEventListener("drop", event => {
+        event.preventDefault()
+        const word = event.dataTransfer.getData("text/plain")
         fillBlank(i, word)
       })
 
       blank.addEventListener("click", () => {
         const currentSlot = puzzleSlots.find(s => s.index === i)
-        if (currentSlot) {
+        if (!currentSlot) return
+
+        if (selectedBankWord) {
+          currentSlot.filled = selectedBankWord
+          selectedBankWord = ""
+          renderDragPuzzle()
+          return
+        }
+
+        if (currentSlot.filled) {
           currentSlot.filled = ""
           renderDragPuzzle()
         }
@@ -307,21 +325,26 @@ function renderDragPuzzle() {
     blankLine.appendChild(document.createTextNode(" "))
   }
 
-  const used = new Set(puzzleSlots.map(s => s.filled).filter(Boolean))
   const bankWords = puzzleSlots
-    .map(s => s.expected)
-    .filter(w => !used.has(w))
+    .filter(slot => !slot.filled)
+    .map(slot => slot.expected)
 
   bankWords.sort(() => Math.random() - 0.5)
 
-  bankWords.forEach(w => {
+  bankWords.forEach(word => {
     const pill = document.createElement("span")
     pill.className = "pill"
-    pill.textContent = w
+    pill.textContent = word
     pill.draggable = true
 
-    pill.addEventListener("dragstart", e => {
-      e.dataTransfer.setData("text/plain", w)
+    pill.addEventListener("dragstart", event => {
+      event.dataTransfer.setData("text/plain", word)
+    })
+
+    pill.addEventListener("click", () => {
+      selectedBankWord = word
+      document.querySelectorAll(".pill").forEach(p => p.classList.remove("active"))
+      pill.classList.add("active")
     })
 
     wordBank.appendChild(pill)
@@ -330,9 +353,10 @@ function renderDragPuzzle() {
 
 function fillBlank(index, word) {
   const slot = puzzleSlots.find(s => s.index === index)
-  if (!slot) return
+  if (!slot || !word) return
 
   slot.filled = word
+  selectedBankWord = ""
   renderDragPuzzle()
 }
 
@@ -344,8 +368,8 @@ function renderLettersGame() {
     wrapper.className = "letterWord"
 
     const cleanWord = word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "")
-    const leading = word.match(/^[^a-zA-Z0-9]+/)?.[0] || ""
-    const trailing = word.match(/[^a-zA-Z0-9]+$/)?.[0] || ""
+    const leading = (word.match(/^[^a-zA-Z0-9]+/) || [""])[0]
+    const trailing = (word.match(/[^a-zA-Z0-9]+$/) || [""])[0]
 
     if (!cleanWord) {
       const plain = document.createElement("span")
@@ -392,9 +416,9 @@ function renderLettersGame() {
       }
     })
 
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Backspace" && input.classList.contains("isHidden")) {
-        e.preventDefault()
+    input.addEventListener("keydown", event => {
+      if (event.key === "Backspace" && input.classList.contains("isHidden")) {
+        event.preventDefault()
       }
     })
 
@@ -422,9 +446,9 @@ function moveToNextLetterBox() {
 }
 
 function checkTypeMode() {
-  const expectedWords = words.map(word =>
-    normalize(word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, ""))
-  ).filter(Boolean)
+  const expectedWords = words
+    .map(word => normalize(word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "")))
+    .filter(Boolean)
 
   const userWords = normalize(answer.value).split(" ").filter(Boolean)
 
@@ -460,18 +484,18 @@ function checkDragMode() {
   let correct = 0
   let filled = 0
 
-  puzzleSlots.forEach(s => {
-    if (s.filled && s.filled.trim() !== "") filled += 1
-    if (normalize(s.filled || "") === normalize(s.expected || "")) correct += 1
+  puzzleSlots.forEach(slot => {
+    if (slot.filled && slot.filled.trim() !== "") filled += 1
+    if (normalize(slot.filled || "") === normalize(slot.expected || "")) correct += 1
   })
 
   const total = puzzleSlots.length
-  const pct = Math.round((correct / total) * 100)
+  const percent = total === 0 ? 0 : Math.round((correct / total) * 100)
 
-  result.textContent = filled + "/" + total + " filled. " + correct + "/" + total + " correct. " + pct + "%."
-  result.className = pct === 100 ? "result good" : "result bad"
+  result.textContent = filled + "/" + total + " filled. " + correct + "/" + total + " correct. " + percent + "%."
+  result.className = percent === 100 ? "result good" : "result bad"
 
-  if (pct === 100) {
+  if (percent === 100) {
     saveScore()
   }
 }
@@ -535,11 +559,12 @@ function checkCurrentMode() {
 }
 
 function revealOneBlank() {
-  const empty = puzzleSlots.filter(s => !s.filled)
+  const empty = puzzleSlots.filter(slot => !slot.filled)
   if (empty.length === 0) return
 
   const pick = empty[Math.floor(Math.random() * empty.length)]
   pick.filled = pick.expected
+  selectedBankWord = ""
   renderDragPuzzle()
 }
 
@@ -697,7 +722,7 @@ function renderLibrary() {
     return
   }
 
-  verses.forEach(v => {
+  verses.forEach(verse => {
     const card = document.createElement("div")
     card.className = "customItem"
 
@@ -705,10 +730,10 @@ function renderLibrary() {
     meta.className = "meta"
 
     const title = document.createElement("div")
-    title.textContent = v.ref
+    title.textContent = verse.ref
 
     const preview = document.createElement("small")
-    preview.textContent = v.text.slice(0, 80) + (v.text.length > 80 ? "..." : "")
+    preview.textContent = verse.text.slice(0, 80) + (verse.text.length > 80 ? "..." : "")
 
     meta.appendChild(title)
     meta.appendChild(preview)
@@ -720,18 +745,18 @@ function renderLibrary() {
     playBtn.type = "button"
     playBtn.className = "ghost"
     playBtn.textContent = "Play"
-    playBtn.addEventListener("click", e => {
-      e.stopPropagation()
-      openGamePicker(v.id)
+    playBtn.addEventListener("click", event => {
+      event.stopPropagation()
+      openGamePicker(verse.id)
     })
 
     const delBtn = document.createElement("button")
     delBtn.type = "button"
     delBtn.className = "danger"
     delBtn.textContent = "Delete"
-    delBtn.addEventListener("click", e => {
-      e.stopPropagation()
-      confirmDelete(v.id, card)
+    delBtn.addEventListener("click", event => {
+      event.stopPropagation()
+      confirmDelete(verse.id, card)
     })
 
     actions.appendChild(playBtn)
@@ -740,7 +765,7 @@ function renderLibrary() {
     card.appendChild(meta)
     card.appendChild(actions)
 
-    card.addEventListener("click", () => openGamePicker(v.id))
+    card.addEventListener("click", () => openGamePicker(verse.id))
     libraryGrid.appendChild(card)
   })
 }
@@ -783,7 +808,7 @@ function confirmDelete(id, row) {
 }
 
 function deleteCustomVerse(id) {
-  const custom = getCustomVerses().filter(v => v.id !== id)
+  const custom = getCustomVerses().filter(verse => verse.id !== id)
   setCustomVerses(custom)
 
   refreshVerses()
@@ -800,7 +825,7 @@ function deleteCustomVerse(id) {
   }
 
   const currentSelected = verseSelect.value
-  const stillExists = verses.some(v => v.id === currentSelected)
+  const stillExists = verses.some(verse => verse.id === currentSelected)
 
   rebuildDropdown(stillExists ? currentSelected : verses[0].id)
   renderLibrary()
@@ -819,8 +844,8 @@ function saveNewVerse() {
   const custom = getCustomVerses()
   const item = {
     id: "custom_" + Date.now(),
-    ref: ref,
-    text: text
+    ref,
+    text
   }
 
   custom.unshift(item)
@@ -836,8 +861,8 @@ function saveNewVerse() {
   newRef.focus()
 }
 
-verseSelect.addEventListener("change", e => {
-  loadVerse(e.target.value)
+verseSelect.addEventListener("change", event => {
+  loadVerse(event.target.value)
 })
 
 btnRevealOne.addEventListener("click", revealOneWord)

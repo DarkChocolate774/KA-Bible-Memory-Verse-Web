@@ -48,11 +48,7 @@ let hiddenIndexes = []
 let selectedVerseId = ""
 let currentMode = "type"
 
-let puzzleHidden = []
-let puzzleSlots = []
-let selectedBankWord = ""
-let titleWordCount = 0
-let dragDifficulty = 1
+let tapDifficulty = "easy"
 
 const btnLogin = document.getElementById("btnLogin")
 const btnLogout = document.getElementById("btnLogout")
@@ -89,6 +85,9 @@ const lettersGame = document.getElementById("lettersGame")
 const dragGame = document.getElementById("dragGame")
 const blankLine = document.getElementById("blankLine")
 const wordBank = document.getElementById("wordBank")
+const difficultyEasy = document.getElementById("difficultyEasy")
+const difficultyMedium = document.getElementById("difficultyMedium")
+const difficultyHard = document.getElementById("difficultyHard")
 
 const btnHideAll = document.getElementById("btnHideAll")
 const btnReset = document.getElementById("btnReset")
@@ -127,7 +126,7 @@ const provider = new GoogleAuthProvider()
 
 let currentUser = null
 
-  async function loginWithGoogle() {
+async function loginWithGoogle() {
   console.log("login button clicked")
 
   try {
@@ -318,11 +317,6 @@ function loadVerse(id) {
   words = [...verseWords]
 
   hiddenIndexes = []
-  puzzleHidden = []
-  puzzleSlots = []
-  selectedBankWord = ""
-
-  titleWordCount = titleWords.length
 
   renderVerse()
   answer.value = ""
@@ -426,20 +420,39 @@ function resetTypeMode() {
 }
 
 function buildDragPuzzle() {
+  const ratio = getDifficultyRatio()
 
-  const difficultyLevels = [0.2, 0.35, 0.5, 0.7, 0.9]
-  const ratio = difficultyLevels[Math.min(dragDifficulty - 1, difficultyLevels.length - 1)]
+  const verseHideCount = Math.max(1, Math.floor(verseWords.length * ratio))
+  const titleHideCount = titleWords.length > 0
+    ? Math.max(1, Math.floor(titleWords.length * ratio))
+    : 0
 
-  const hideCount = Math.max(1, Math.floor(verseWords.length * ratio))
-
+  titlePuzzleHidden = []
+  titlePuzzleSlots = []
   versePuzzleHidden = []
+  versePuzzleSlots = []
+
+  selectedTitleBankWord = ""
   selectedVerseBankWord = ""
 
-  const indexes = verseWords.map((word, index) => index)
+  const titleIndexes = titleWords.map((word, index) => index)
+  while (titlePuzzleHidden.length < titleHideCount && titleIndexes.length > 0) {
+    const randomPos = Math.floor(Math.random() * titleIndexes.length)
+    titlePuzzleHidden.push(titleIndexes.splice(randomPos, 1)[0])
+  }
 
-  while (versePuzzleHidden.length < hideCount && indexes.length > 0) {
-    const randomPos = Math.floor(Math.random() * indexes.length)
-    versePuzzleHidden.push(indexes.splice(randomPos, 1)[0])
+  titlePuzzleHidden.sort((a, b) => a - b)
+
+  titlePuzzleSlots = titlePuzzleHidden.map(index => ({
+    index,
+    expected: titleWords[index],
+    filled: ""
+  }))
+
+  const verseIndexes = verseWords.map((word, index) => index)
+  while (versePuzzleHidden.length < verseHideCount && verseIndexes.length > 0) {
+    const randomPos = Math.floor(Math.random() * verseIndexes.length)
+    versePuzzleHidden.push(verseIndexes.splice(randomPos, 1)[0])
   }
 
   versePuzzleHidden.sort((a, b) => a - b)
@@ -450,7 +463,22 @@ function buildDragPuzzle() {
     filled: ""
   }))
 
+  updateDifficultyButtons()
   renderDragPuzzle()
+}
+
+function getDifficultyRatio() {
+  if (tapDifficulty === "medium") return 0.5
+  if (tapDifficulty === "hard") return 0.75
+  return 0.25
+}
+
+function updateDifficultyButtons() {
+  if (!difficultyEasy || !difficultyMedium || !difficultyHard) return
+
+  difficultyEasy.classList.toggle("active", tapDifficulty === "easy")
+  difficultyMedium.classList.toggle("active", tapDifficulty === "medium")
+  difficultyHard.classList.toggle("active", tapDifficulty === "hard")
 }
 
 function renderDragPuzzle() {
@@ -474,16 +502,6 @@ function renderDragPuzzle() {
 
         blank.textContent = slot && slot.filled ? slot.filled : "_____"
         blank.className = slot && slot.filled ? "blank filled" : "blank"
-
-        blank.addEventListener("dragover", event => {
-          event.preventDefault()
-        })
-
-        blank.addEventListener("drop", event => {
-          event.preventDefault()
-          const word = event.dataTransfer.getData("text/plain")
-          fillTitleBlank(i, word)
-        })
 
         blank.addEventListener("click", () => {
           const currentSlot = titlePuzzleSlots.find(s => s.index === i)
@@ -522,11 +540,6 @@ function renderDragPuzzle() {
       const pill = document.createElement("span")
       pill.className = "pill"
       pill.textContent = word
-      pill.draggable = true
-
-      pill.addEventListener("dragstart", event => {
-        event.dataTransfer.setData("text/plain", word)
-      })
 
       pill.addEventListener("click", () => {
         selectedTitleBankWord = word
@@ -547,16 +560,6 @@ function renderDragPuzzle() {
 
       blank.textContent = slot && slot.filled ? slot.filled : "_____"
       blank.className = slot && slot.filled ? "blank filled" : "blank"
-
-      blank.addEventListener("dragover", event => {
-        event.preventDefault()
-      })
-
-      blank.addEventListener("drop", event => {
-        event.preventDefault()
-        const word = event.dataTransfer.getData("text/plain")
-        fillVerseBlank(i, word)
-      })
 
       blank.addEventListener("click", () => {
         const currentSlot = versePuzzleSlots.find(s => s.index === i)
@@ -595,11 +598,6 @@ function renderDragPuzzle() {
     const pill = document.createElement("span")
     pill.className = "pill"
     pill.textContent = word
-    pill.draggable = true
-
-    pill.addEventListener("dragstart", event => {
-      event.dataTransfer.setData("text/plain", word)
-    })
 
     pill.addEventListener("click", () => {
       selectedVerseBankWord = word
@@ -609,33 +607,6 @@ function renderDragPuzzle() {
 
     wordBank.appendChild(pill)
   })
-}
-
-function fillTitleBlank(index, word) {
-  const slot = titlePuzzleSlots.find(s => s.index === index)
-  if (!slot || !word) return
-
-  slot.filled = word
-  selectedTitleBankWord = ""
-  renderDragPuzzle()
-}
-
-function fillVerseBlank(index, word) {
-  const slot = versePuzzleSlots.find(s => s.index === index)
-  if (!slot || !word) return
-
-  slot.filled = word
-  selectedVerseBankWord = ""
-  renderDragPuzzle()
-}
-
-function fillBlank(index, word) {
-  const slot = puzzleSlots.find(s => s.index === index)
-  if (!slot || !word) return
-
-  slot.filled = word
-  selectedBankWord = ""
-  renderDragPuzzle()
 }
 
 function renderLettersGame() {
@@ -832,7 +803,6 @@ function checkDragMode() {
 
   if (percent === 100) {
     saveScore()
-    dragDifficulty += 1
   }
 }
 
@@ -1019,7 +989,6 @@ function giveHint() {
 
 function resetCurrentGame() {
   if (currentMode === "drag") {
-    dragDifficulty += 1
     buildDragPuzzle()
     result.textContent = ""
     result.className = "result"
@@ -1383,6 +1352,45 @@ function autoFillFromPastedText() {
   newText.value = cleanedVerseText
 
   manageMsg.textContent = "Auto filled."
+}
+
+if (difficultyEasy) {
+  difficultyEasy.addEventListener("click", () => {
+    tapDifficulty = "easy"
+    if (currentMode === "drag") {
+      buildDragPuzzle()
+      result.textContent = ""
+      result.className = "result"
+    } else {
+      updateDifficultyButtons()
+    }
+  })
+}
+
+if (difficultyMedium) {
+  difficultyMedium.addEventListener("click", () => {
+    tapDifficulty = "medium"
+    if (currentMode === "drag") {
+      buildDragPuzzle()
+      result.textContent = ""
+      result.className = "result"
+    } else {
+      updateDifficultyButtons()
+    }
+  })
+}
+
+if (difficultyHard) {
+  difficultyHard.addEventListener("click", () => {
+    tapDifficulty = "hard"
+    if (currentMode === "drag") {
+      buildDragPuzzle()
+      result.textContent = ""
+      result.className = "result"
+    } else {
+      updateDifficultyButtons()
+    }
+  })
 }
 
 btnBackToGame.addEventListener("click", () => {

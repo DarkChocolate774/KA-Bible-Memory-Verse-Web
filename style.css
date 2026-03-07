@@ -266,6 +266,12 @@ textarea:disabled {
   background: var(--accent-soft);
 }
 
+.difficultyBtn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
 #libraryGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -325,10 +331,11 @@ textarea:disabled {
   padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  cursor: grab;
+  cursor: pointer;
   background: var(--field);
   user-select: none;
   -webkit-user-select: none;
+  touch-action: manipulation;
 }
 
 .pill.active {

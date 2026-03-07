@@ -1305,11 +1305,18 @@ function autoFillFromPastedText() {
 
   let combinedText = contentLines.join(" ").replace(/\s+/g, " ").trim()
 
-  const referenceMatch = combinedText.match(/([1-3]?\s?[A-Za-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:-\d+)?)/)
+  const referenceMatch = combinedText.match(/((?:[1-3]\s)?[A-Za-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:-\d+)?(?:\s+[A-Z]{2,5})?)/)
 
   let referenceLine = ""
   if (referenceMatch) {
     referenceLine = referenceMatch[1].trim()
+
+    const versionMatch = referenceLine.match(/\b([A-Z]{2,5})$/)
+    if (versionMatch) {
+      version = versionMatch[1]
+      referenceLine = referenceLine.replace(version, "").trim()
+    }
+
     combinedText = combinedText.replace(referenceMatch[1], "").trim()
   }
 

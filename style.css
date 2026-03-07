@@ -73,19 +73,19 @@ body[data-theme="forest"] {
   --shadow: rgba(0, 0, 0, 0.3);
 }
 
-body[data-theme="white"]{
---bg:#ffffff;
---bg-2:#f6f6f6;
---card:#ffffff;
---text:#222222;
---muted:#666666;
---accent:#2b6cff;
---accent-soft:rgba(43,108,255,0.10);
---good:#2e8b57;
---bad:#cc4444;
---line:rgba(0,0,0,0.10);
---field:#f5f5f5;
---shadow:rgba(0,0,0,0.08);
+body[data-theme="white"] {
+  --bg: #ffffff;
+  --bg-2: #f6f6f6;
+  --card: #ffffff;
+  --text: #222222;
+  --muted: #666666;
+  --accent: #2b6cff;
+  --accent-soft: rgba(43, 108, 255, 0.10);
+  --good: #2e8b57;
+  --bad: #cc4444;
+  --line: rgba(0, 0, 0, 0.10);
+  --field: #f5f5f5;
+  --shadow: rgba(0, 0, 0, 0.08);
 }
 
 
@@ -410,6 +410,18 @@ textarea:disabled {
     width: 40px;
     height: 40px;
   }
+
+  .topNav {
+    align-items: stretch;
+  }
+
+  .authControls {
+    width: 100%;
+  }
+
+  .authControls button {
+    flex: 1;
+  }
 }
 
 #practiceTitle,
@@ -424,4 +436,27 @@ textarea:disabled {
   flex-wrap: wrap;
   gap: 8px;
   line-height: 1.8;
+}
+
+.topNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.authControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tabs,
+.authControls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }

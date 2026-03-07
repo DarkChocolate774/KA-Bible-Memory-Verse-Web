@@ -1295,15 +1295,7 @@ function autoFillFromPastedText() {
   const urlLine = lines.find(line => urlPattern.test(line)) || ""
   const contentLines = lines.filter(line => !urlPattern.test(line))
 
-  if (contentLines.length === 0) {
-    manageMsg.textContent = "Could not find verse text."
-    return
-  }
-
-  let referenceLine = ""
   let version = ""
-  let verseLines = []
-
   if (urlLine) {
     const versionMatch = urlLine.match(/\.([A-Z0-9]+)$/i)
     if (versionMatch) {
@@ -1311,35 +1303,17 @@ function autoFillFromPastedText() {
     }
   }
 
-  const firstLine = contentLines[0] || ""
-  const lastLine = contentLines[contentLines.length - 1] || ""
+  let combinedText = contentLines.join(" ").replace(/\s+/g, " ").trim()
 
-  const looksLikeReference = (line) => {
-    return /\d+:\d+/.test(line)
+  const referenceMatch = combinedText.match(/([1-3]?\s?[A-Za-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:-\d+)?)/)
+
+  let referenceLine = ""
+  if (referenceMatch) {
+    referenceLine = referenceMatch[1].trim()
+    combinedText = combinedText.replace(referenceMatch[1], "").trim()
   }
 
-  if (looksLikeReference(firstLine)) {
-    referenceLine = firstLine
-
-    if (!version) {
-      const refVersionMatch = firstLine.match(/\b([A-Z]{2,})$/)
-      if (refVersionMatch) {
-        version = refVersionMatch[1].toUpperCase()
-      }
-    }
-
-    referenceLine = referenceLine.replace(/\b([A-Z]{2,})$/, "").trim()
-    verseLines = contentLines.slice(1)
-  } else if (looksLikeReference(lastLine)) {
-    referenceLine = lastLine
-    verseLines = contentLines.slice(0, -1)
-  } else {
-    verseLines = contentLines.slice()
-  }
-
-  let cleanedVerseText = verseLines.join(" ").trim()
-
-  cleanedVerseText = cleanedVerseText
+  combinedText = combinedText
     .replace(/^\[\d+\]\s*/, "")
     .replace(/^['"“”‘’]+\s*/, "")
     .replace(/\s*['"“”‘’]+$/, "")
@@ -1349,9 +1323,13 @@ function autoFillFromPastedText() {
 
   newRef.value = referenceLine
   newVersion.value = version
-  newText.value = cleanedVerseText
+  newText.value = combinedText
 
-  manageMsg.textContent = "Auto filled."
+  if (referenceLine || combinedText) {
+    manageMsg.textContent = "Auto filled."
+  } else {
+    manageMsg.textContent = "Could not detect verse text and reference."
+  }
 }
 
 if (difficultyEasy) {

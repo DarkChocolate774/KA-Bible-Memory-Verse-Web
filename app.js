@@ -192,6 +192,15 @@ const moveVerseGroupSelect = document.getElementById("moveVerseGroupSelect")
 const btnSaveMoveVerse = document.getElementById("btnSaveMoveVerse")
 const btnCancelMoveVerse = document.getElementById("btnCancelMoveVerse")
 
+const btnImportCsvPage = document.getElementById("btnImportCsvPage")
+const pageImportCsv = document.getElementById("pageImportCsv")
+const csvFileInput = document.getElementById("csvFileInput")
+const importCollectionSelect = document.getElementById("importCollectionSelect")
+const importGroupSelect = document.getElementById("importGroupSelect")
+const btnImportCsv = document.getElementById("btnImportCsv")
+const btnCancelImportCsv = document.getElementById("btnCancelImportCsv")
+const importCsvMsg = document.getElementById("importCsvMsg")
+
 let currentUser = null
 
 async function loginWithGoogle() {
@@ -1126,6 +1135,7 @@ function applyModeUI() {
 }
 
 function showPage(name) {
+  pageImportCsv.classList.add("isHidden")
   pagePractice.classList.add("isHidden")
   pageLibrary.classList.add("isHidden")
   pageAddCollection.classList.add("isHidden")
@@ -1163,6 +1173,15 @@ function showPage(name) {
     newGroupName.value = ""
     groupMsg.textContent = ""
     newGroupName.focus()
+    return
+  }
+
+  if (name === "importCsv") {
+    pageImportCsv.classList.remove("isHidden")
+    renderImportCollectionOptions()
+    renderImportGroupOptions(importCollectionSelect.value || "None")
+    importCsvMsg.textContent = ""
+    csvFileInput.value = ""
     return
   }
 
@@ -1251,8 +1270,6 @@ function renderGroupFilters() {
     groupFilters.appendChild(btn)
   })
 }
-
-
 
 function renderLibrary() {
   refreshVerses()
@@ -2224,6 +2241,159 @@ async function saveMoveVerse() {
   }
 }
 
+function renderImportCollectionOptions(selectedValue = "None") {
+  if (!importCollectionSelect) return
+
+  const collectionNames = ["None", ...collections.map(item => item.name).filter(name => name !== "None")]
+
+  importCollectionSelect.innerHTML = collectionNames
+    .map(name => `<option value="${name}">${name}</option>`)
+    .join("")
+
+  importCollectionSelect.value = collectionNames.includes(selectedValue) ? selectedValue : "None"
+}
+
+function renderImportGroupOptions(collectionName, selectedValue = "") {
+  if (!importGroupSelect) return
+
+  if (!collectionName || collectionName === "None") {
+    importGroupSelect.innerHTML = `<option value="">No group</option>`
+    importGroupSelect.value = ""
+    importGroupSelect.disabled = true
+    return
+  }
+
+  const filteredGroups = groups.filter(item => item.collection === collectionName)
+
+  importGroupSelect.innerHTML = `
+    <option value="">No group</option>
+    ${filteredGroups.map(item => `<option value="${item.name}">${item.name}</option>`).join("")}
+  `
+
+  importGroupSelect.value =
+    selectedValue && filteredGroups.some(item => item.name === selectedValue)
+      ? selectedValue
+      : ""
+
+  importGroupSelect.disabled = false
+}
+
+function parseCsvText(csvText) {
+  const rows = []
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== "")
+
+  if (lines.length < 2) return rows
+
+  const parseLine = (line) => {
+    const result = []
+    let current = ""
+    let inQuotes = false
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      const next = line[i + 1]
+
+      if (char === '"') {
+        if (inQuotes && next === '"') {
+          current += '"'
+          i += 1
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === "," && !inQuotes) {
+        result.push(current.trim())
+        current = ""
+      } else {
+        current += char
+      }
+    }
+
+    result.push(current.trim())
+    return result
+  }
+
+  const headers = parseLine(lines[0]).map(h => h.toLowerCase())
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseLine(lines[i])
+    const row = {}
+
+    headers.forEach((header, index) => {
+      row[header] = values[index] || ""
+    })
+
+    rows.push(row)
+  }
+
+  return rows
+}
+
+async function importCsvFile() {
+  if (!currentUser) {
+    importCsvMsg.textContent = "Please log in first."
+    return
+  }
+
+  const file = csvFileInput.files && csvFileInput.files[0]
+  if (!file) {
+    importCsvMsg.textContent = "Please choose a CSV file."
+    return
+  }
+
+  const collectionValue = importCollectionSelect.value || "None"
+  const groupValue = collectionValue === "None" ? "" : (importGroupSelect.value || "")
+
+  try {
+    const csvText = await file.text()
+    const rows = parseCsvText(csvText)
+
+    if (rows.length === 0) {
+      importCsvMsg.textContent = "No valid CSV rows found."
+      return
+    }
+
+    const batch = writeBatch(db)
+    let addedCount = 0
+
+    rows.forEach(row => {
+      const ref = (row.ref || "").trim()
+      const version = (row.version || "").trim()
+      const text = (row.text || "").trim()
+      const title = (row.title || "").trim()
+
+      if (!ref || !text) return
+
+      const verseRef = doc(collection(db, "users", currentUser.uid, "verses"))
+
+      batch.set(verseRef, {
+        ref,
+        version,
+        text,
+        title,
+        collection: collectionValue,
+        group: groupValue,
+        createdAt: serverTimestamp()
+      })
+
+      addedCount += 1
+    })
+
+    if (addedCount === 0) {
+      importCsvMsg.textContent = "No rows with ref and text were found."
+      return
+    }
+
+    await batch.commit()
+    await loadVersesFromCloud()
+
+    importCsvMsg.textContent = addedCount + " verse(s) imported."
+    csvFileInput.value = ""
+  } catch (error) {
+    console.error("CSV import failed:", error)
+    importCsvMsg.textContent = "Failed to import CSV."
+  }
+}
+
 moveVerseCollectionSelect.addEventListener("change", () => {
   const selectedCollection = moveVerseCollectionSelect.value || "None"
   renderMoveVerseGroupOptions(selectedCollection, "")
@@ -2306,6 +2476,16 @@ pasteBox.addEventListener("paste", () => {
 
 themeSelect.addEventListener("change", event => {
   saveTheme(event.target.value)
+})
+
+btnImportCsvPage.addEventListener("click", () => showPage("importCsv"))
+
+btnCancelImportCsv.addEventListener("click", () => showPage("library"))
+
+btnImportCsv.addEventListener("click", importCsvFile)
+
+importCollectionSelect.addEventListener("change", () => {
+  renderImportGroupOptions(importCollectionSelect.value || "None", "")
 })
 
 initTheme()

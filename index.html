@@ -133,6 +133,7 @@
 
                 <div class="controls">
                     <button id="btnAutoFill" type="button">Auto Fill</button>
+                    <button id="btnImportCsvPage" type="button">Import CSV</button>
                 </div>
 
                 <div class="row">
@@ -251,6 +252,43 @@
                 </div>
 
                 <div class="result" id="groupMsg"></div>
+            </section>
+        </section>
+
+        <section id="pageImportCsv" class="isHidden">
+            <section class="card">
+                <h2>Import CSV</h2>
+
+                <div class="row">
+                    <label for="csvFileInput">Choose CSV file</label>
+                    <input id="csvFileInput" type="file" accept=".csv,text/csv">
+                </div>
+
+                <div class="row">
+                    <label for="importCollectionSelect">Collection</label>
+                    <select id="importCollectionSelect">
+                        <option value="None">None</option>
+                    </select>
+                </div>
+
+                <div class="row">
+                    <label for="importGroupSelect">Group</label>
+                    <select id="importGroupSelect">
+                        <option value="">No group</option>
+                    </select>
+                </div>
+
+                <div class="row">
+                    <label>Expected CSV columns</label>
+                    <div class="result">ref, version, text, title</div>
+                </div>
+
+                <div class="controls">
+                    <button id="btnImportCsv" type="button">Import CSV</button>
+                    <button id="btnCancelImportCsv" type="button" class="ghost">Cancel</button>
+                </div>
+
+                <div class="result" id="importCsvMsg"></div>
             </section>
         </section>
 

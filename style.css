@@ -532,3 +532,7 @@ textarea:disabled {
 .modalCard select {
   margin-top: 4px;
 }
+
+#pageImportCsv input[type="file"] {
+  padding: 10px 0;
+}

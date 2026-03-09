@@ -1281,9 +1281,18 @@ function autoFillFromPastedText() {
     return
   }
 
+  const cleanInvisibleChars = (text) => {
+    return String(text || "")
+      .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/\s+/g, " ")
+      .trim()
+  }
+
   const lines = raw
-    .split("\n")
-    .map(line => line.trim())
+    .split(/\r?\n/)
+    .map(line => cleanInvisibleChars(line))
     .filter(line => line !== "")
 
   if (lines.length === 0) {
@@ -1296,34 +1305,56 @@ function autoFillFromPastedText() {
   const contentLines = lines.filter(line => !urlPattern.test(line))
 
   let version = ""
+
   if (urlLine) {
-    const versionMatch = urlLine.match(/\.([A-Z0-9]+)$/i)
-    if (versionMatch) {
-      version = versionMatch[1].toUpperCase()
+    const urlVersionMatch = urlLine.match(/\.([A-Z0-9]{2,8})$/i)
+    if (urlVersionMatch) {
+      version = urlVersionMatch[1].toUpperCase()
     }
   }
 
-  let combinedText = contentLines.join(" ").replace(/\s+/g, " ").trim()
-
-  const referenceMatch = combinedText.match(/((?:[1-3]\s)?[A-Za-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:-\d+)?(?:\s+[A-Z]{2,5})?)/)
-
   let referenceLine = ""
-  if (referenceMatch) {
-    referenceLine = referenceMatch[1].trim()
+  let verseParts = []
 
-    const versionMatch = referenceLine.match(/\b([A-Z]{2,5})$/)
-    if (versionMatch) {
-      version = versionMatch[1]
-      referenceLine = referenceLine.replace(version, "").trim()
+  const referencePattern = /^((?:[1-3]\s*)?[A-Za-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:-\d+)?)(?:\s+([A-Z]{2,8}))?$/i
+
+  contentLines.forEach(line => {
+    const fullReferenceMatch = line.match(referencePattern)
+
+    if (fullReferenceMatch && !referenceLine) {
+      referenceLine = fullReferenceMatch[1].trim()
+
+      if (fullReferenceMatch[2]) {
+        version = fullReferenceMatch[2].toUpperCase()
+      }
+
+      return
     }
 
-    combinedText = combinedText.replace(referenceMatch[1], "").trim()
+    verseParts.push(line)
+  })
+
+  let combinedText = verseParts.join(" ").replace(/\s+/g, " ").trim()
+
+  if (!referenceLine) {
+    const inlineReferencePattern = /((?:[1-3]\s*)?[A-Za-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:-\d+)?)(?:\s+([A-Z]{2,8}))?/i
+    const inlineMatch = combinedText.match(inlineReferencePattern)
+
+    if (inlineMatch) {
+      referenceLine = inlineMatch[1].trim()
+
+      if (inlineMatch[2]) {
+        version = inlineMatch[2].toUpperCase()
+      }
+
+      combinedText = combinedText.replace(inlineMatch[0], "").trim()
+    }
   }
 
   combinedText = combinedText
     .replace(/^\[\d+\]\s*/, "")
-    .replace(/^['"“”‘’]+\s*/, "")
-    .replace(/\s*['"“”‘’]+$/, "")
+    .replace(/^\s*['"]+/, "")
+    .replace(/['"]+\s*$/, "")
     .replace(/\[\d+\]/g, "")
     .replace(/\s+/g, " ")
     .trim()

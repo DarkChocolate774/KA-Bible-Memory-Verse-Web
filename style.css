@@ -460,3 +460,71 @@ textarea:disabled {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+#pageAddCollection .card,
+#pageAddGroup .card {
+  max-width: 100%;
+}
+
+#libraryFilters {
+  margin-bottom: 12px;
+}
+
+#libraryFilters .controls {
+  margin-top: 6px;
+}
+
+.miniActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.linkBtn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.linkBtn:hover {
+  color: var(--accent);
+  background: transparent;
+}
+
+.dangerLink:hover {
+  color: var(--bad);
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modalCard {
+  width: min(640px, 100%);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: 0 12px 28px var(--shadow);
+  padding: 28px;
+}
+
+.modalCard h3 {
+  margin-top: 0;
+  margin-bottom: 18px;
+}
+
+.modalCard p {
+  margin: 0 0 18px;
+}

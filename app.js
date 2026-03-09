@@ -1,4 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"
+
 import {
   getAuth,
   GoogleAuthProvider,
@@ -6,6 +7,7 @@ import {
   onAuthStateChanged,
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"
+
 import {
   getFirestore,
   collection,
@@ -13,6 +15,11 @@ import {
   getDocs,
   deleteDoc,
   doc,
+  setDoc,
+  updateDoc,
+  query,
+  where,
+  writeBatch,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"
 
@@ -49,6 +56,11 @@ let selectedVerseId = ""
 let currentMode = "type"
 
 let tapDifficulty = "easy"
+
+let collections = []
+let groups = []
+let selectedCollectionFilter = "None"
+let selectedGroupFilter = ""
 
 const btnLogin = document.getElementById("btnLogin")
 const btnLogout = document.getElementById("btnLogout")
@@ -121,9 +133,57 @@ const titleLettersSection = document.getElementById("titleLettersSection")
 const titleLettersGame = document.getElementById("titleLettersGame")
 const verseLettersGame = document.getElementById("verseLettersGame")
 
+const collectionSelect = document.getElementById("collectionSelect")
+const groupSelect = document.getElementById("groupSelect")
+
+const pageAddCollection = document.getElementById("pageAddCollection")
+const pageAddGroup = document.getElementById("pageAddGroup")
+
+const newCollectionName = document.getElementById("newCollectionName")
+const newGroupName = document.getElementById("newGroupName")
+
+const btnSaveCollection = document.getElementById("btnSaveCollection")
+const btnCancelCollection = document.getElementById("btnCancelCollection")
+const btnSaveGroup = document.getElementById("btnSaveGroup")
+const btnCancelGroup = document.getElementById("btnCancelGroup")
+
+const collectionMsg = document.getElementById("collectionMsg")
+const groupMsg = document.getElementById("groupMsg")
+
+const collectionFilters = document.getElementById("collectionFilters")
+const groupFilters = document.getElementById("groupFilters")
+
 const auth = getAuth(app)
 const db = getFirestore(app)
 const provider = new GoogleAuthProvider()
+
+const btnAddCollectionInline = document.getElementById("btnAddCollectionInline")
+const btnRenameCollectionInline = document.getElementById("btnRenameCollectionInline")
+const btnDeleteCollectionInline = document.getElementById("btnDeleteCollectionInline")
+
+const btnAddGroupInline = document.getElementById("btnAddGroupInline")
+const btnRenameGroupInline = document.getElementById("btnRenameGroupInline")
+const btnDeleteGroupInline = document.getElementById("btnDeleteGroupInline")
+
+const modalOverlay = document.getElementById("modalOverlay")
+
+const renameCollectionModal = document.getElementById("renameCollectionModal")
+const renameGroupModal = document.getElementById("renameGroupModal")
+const deleteCollectionModal = document.getElementById("deleteCollectionModal")
+const deleteGroupModal = document.getElementById("deleteGroupModal")
+
+const renameCollectionInput = document.getElementById("renameCollectionInput")
+const renameGroupInput = document.getElementById("renameGroupInput")
+
+const btnSaveRenameCollection = document.getElementById("btnSaveRenameCollection")
+const btnCancelRenameCollection = document.getElementById("btnCancelRenameCollection")
+const btnSaveRenameGroup = document.getElementById("btnSaveRenameGroup")
+const btnCancelRenameGroup = document.getElementById("btnCancelRenameGroup")
+
+const btnConfirmDeleteCollection = document.getElementById("btnConfirmDeleteCollection")
+const btnCancelDeleteCollection = document.getElementById("btnCancelDeleteCollection")
+const btnConfirmDeleteGroup = document.getElementById("btnConfirmDeleteGroup")
+const btnCancelDeleteGroup = document.getElementById("btnCancelDeleteGroup")
 
 let currentUser = null
 
@@ -156,8 +216,13 @@ onAuthStateChanged(auth, async (user) => {
     btnLogin.classList.add("isHidden")
     btnLogout.classList.remove("isHidden")
 
+    await loadCollectionsFromCloud()
+    await loadGroupsFromCloud()
+    updateGroupState()
     await loadVersesFromCloud()
-  } else {
+  }
+
+  else {
     authMsg.textContent = "Not signed in."
     btnLogin.classList.remove("isHidden")
     btnLogout.classList.add("isHidden")
@@ -166,6 +231,11 @@ onAuthStateChanged(auth, async (user) => {
     selectedVerseId = ""
     titleWords = []
     verseWords = []
+    collections = []
+    groups = []
+    renderCollectionOptions()
+    updateGroupState()
+    renderGroupOptions()
 
     answer.value = ""
     if (titleAnswer) titleAnswer.value = ""
@@ -200,7 +270,9 @@ async function loadVersesFromCloud() {
         title: data.title || "",
         ref: data.ref || "",
         version: data.version || "",
-        text: data.text || ""
+        text: data.text || "",
+        collection: data.collection || "None",
+        group: data.group || ""
       })
     })
 
@@ -1049,6 +1121,8 @@ function applyModeUI() {
 function showPage(name) {
   pagePractice.classList.add("isHidden")
   pageLibrary.classList.add("isHidden")
+  pageAddCollection.classList.add("isHidden")
+  pageAddGroup.classList.add("isHidden")
   pageGame.classList.add("isHidden")
   pageSettings.classList.add("isHidden")
 
@@ -1066,6 +1140,22 @@ function showPage(name) {
     pageLibrary.classList.remove("isHidden")
     tabLibrary.classList.add("active")
     renderLibrary()
+    return
+  }
+
+  if (name === "addCollection") {
+    pageAddCollection.classList.remove("isHidden")
+    newCollectionName.value = ""
+    collectionMsg.textContent = ""
+    newCollectionName.focus()
+    return
+  }
+
+  if (name === "addGroup") {
+    pageAddGroup.classList.remove("isHidden")
+    newGroupName.value = ""
+    groupMsg.textContent = ""
+    newGroupName.focus()
     return
   }
 
@@ -1105,21 +1195,94 @@ function startSelectedGame(mode) {
   showPage("practice")
 }
 
-function renderLibrary() {
-  refreshVerses()
-  libraryGrid.innerHTML = ""
+function renderCollectionFilters() {
+  if (!collectionFilters) return
 
-  if (verses.length === 0) {
-    libraryGrid.textContent = "No verses yet. Add one above."
+  collectionFilters.innerHTML = ""
+
+  const collectionNames = ["None", ...collections.map(item => item.name).filter(name => name !== "None")]
+
+  collectionNames.forEach(name => {
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = selectedCollectionFilter === name ? "tab active" : "tab"
+    btn.textContent = name
+
+    btn.addEventListener("click", () => {
+      selectedCollectionFilter = name
+      selectedGroupFilter = ""
+      renderGroupFilters()
+      renderLibrary()
+    })
+
+    collectionFilters.appendChild(btn)
+  })
+}
+
+function renderGroupFilters() {
+  if (!groupFilters) return
+
+  groupFilters.innerHTML = ""
+
+  if (!selectedCollectionFilter || selectedCollectionFilter === "None") {
     return
   }
 
-  verses.forEach(verse => {
+  const availableGroups = groups.filter(item => item.collection === selectedCollectionFilter)
+
+  availableGroups.forEach(item => {
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = selectedGroupFilter === item.name ? "tab active" : "tab"
+    btn.textContent = item.name
+
+    btn.addEventListener("click", () => {
+      selectedGroupFilter = selectedGroupFilter === item.name ? "" : item.name
+      renderLibrary()
+    })
+
+    groupFilters.appendChild(btn)
+  })
+}
+
+
+
+function renderLibrary() {
+  refreshVerses()
+
+  renderCollectionFilters()
+  renderGroupFilters()
+
+  libraryGrid.innerHTML = ""
+
+  let filteredVerses = verses.slice()
+
+  if (selectedCollectionFilter) {
+    filteredVerses = filteredVerses.filter(
+      verse => (verse.collection || "None") === selectedCollectionFilter
+    )
+  }
+
+  if (selectedGroupFilter) {
+    filteredVerses = filteredVerses.filter(verse => verse.group === selectedGroupFilter)
+  }
+
+  if (filteredVerses.length === 0) {
+    libraryGrid.textContent = "No verses found for this filter."
+    return
+  }
+
+  filteredVerses.forEach(verse => {
     const card = document.createElement("div")
     card.className = "customItem"
 
     const meta = document.createElement("div")
     meta.className = "meta"
+
+    const categoryLine = document.createElement("small")
+    categoryLine.textContent = verse.group
+      ? (verse.collection || "None") + " • " + verse.group
+      : (verse.collection || "None")
 
     const title = document.createElement("div")
     title.textContent = verse.title
@@ -1129,6 +1292,7 @@ function renderLibrary() {
     const preview = document.createElement("small")
     preview.textContent = verse.text.slice(0, 80) + (verse.text.length > 80 ? "..." : "")
 
+    meta.appendChild(categoryLine)
     meta.appendChild(title)
     meta.appendChild(preview)
 
@@ -1207,6 +1371,8 @@ function confirmDelete(id, row) {
 }
 
 async function saveNewVerse() {
+  const collectionValue = collectionSelect.value.trim() || "None"
+  const groupValue = groupSelect.value.trim()
   const title = newTitle.value.trim()
   const ref = newRef.value.trim()
   const version = newVersion.value.trim()
@@ -1230,6 +1396,8 @@ async function saveNewVerse() {
       ref,
       version,
       text,
+      collection: collectionValue,
+      group: groupValue,
       createdAt: serverTimestamp()
     })
 
@@ -1239,6 +1407,9 @@ async function saveNewVerse() {
     newRef.value = ""
     newVersion.value = ""
     newText.value = ""
+    collectionSelect.value = ""
+    groupSelect.value = ""
+    updateGroupState()
     pasteBox.focus()
 
     await loadVersesFromCloud()
@@ -1273,6 +1444,9 @@ function clearVerseForm() {
   newRef.value = ""
   newVersion.value = ""
   newText.value = ""
+  collectionSelect.value = ""
+  groupSelect.value = ""
+  updateGroupState()
   manageMsg.textContent = "Cleared."
   pasteBox.focus()
 }
@@ -1438,6 +1612,565 @@ if (difficultyHard) {
     }
   })
 }
+
+function renderCollectionOptions(selectedValue = "") {
+  if (!collectionSelect) return
+
+  collectionSelect.innerHTML = `
+    <option value="">Select collection</option>
+    ${collections.map(item => `<option value="${item.name}">${item.name}</option>`).join("")}
+    <option value="__add_new__">+ Add new collection</option>
+  `
+
+  collectionSelect.value = selectedValue && collections.some(item => item.name === selectedValue)
+    ? selectedValue
+    : ""
+}
+
+function renderGroupOptions(selectedValue = "") {
+  if (!groupSelect) return
+
+  const selectedCollection = collectionSelect.value || "None"
+
+  let filteredGroups = groups.filter(item => item.collection === selectedCollection)
+
+  groupSelect.innerHTML = `
+    <option value="">Select group</option>
+    ${filteredGroups.map(item => `<option value="${item.name}">${item.name}</option>`).join("")}
+    <option value="__add_new__">+ Add new group</option>
+  `
+
+  groupSelect.value = selectedValue && filteredGroups.some(item => item.name === selectedValue)
+    ? selectedValue
+    : ""
+}
+
+async function loadCollectionsFromCloud() {
+  if (!currentUser) {
+    collections = []
+    renderCollectionOptions()
+    return
+  }
+
+  try {
+    const snap = await getDocs(collection(db, "users", currentUser.uid, "collections"))
+    collections = []
+
+    snap.forEach(docSnap => {
+      const data = docSnap.data()
+      collections.push({
+        id: docSnap.id,
+        name: data.name || docSnap.id
+      })
+    })
+
+    collections.sort((a, b) => a.name.localeCompare(b.name))
+    renderCollectionOptions()
+  } catch (error) {
+    console.error("Load collections failed:", error)
+  }
+}
+
+async function loadGroupsFromCloud() {
+  if (!currentUser) {
+    groups = []
+    renderGroupOptions()
+    return
+  }
+
+  try {
+    const snap = await getDocs(collection(db, "users", currentUser.uid, "groups"))
+    groups = []
+
+    snap.forEach(docSnap => {
+      const data = docSnap.data()
+      groups.push({
+        id: docSnap.id,
+        name: data.name || "",
+        collection: data.collection || "None"
+      })
+    })
+
+    groups.sort((a, b) => a.name.localeCompare(b.name))
+    renderGroupOptions()
+  } catch (error) {
+    console.error("Load groups failed:", error)
+  }
+}
+
+async function saveCollection() {
+  const name = (newCollectionName.value || "").trim()
+
+  if (!currentUser) {
+    collectionMsg.textContent = "Please log in first."
+    return
+  }
+
+  if (!name) {
+    collectionMsg.textContent = "Please enter a collection name."
+    return
+  }
+
+  try {
+    await setDoc(doc(db, "users", currentUser.uid, "collections", name), {
+      name,
+      createdAt: serverTimestamp()
+    })
+
+    await loadCollectionsFromCloud()
+    renderCollectionOptions(name)
+    collectionMsg.textContent = "Saved."
+    showPage("library")
+  } catch (error) {
+    console.error("Save collection failed:", error)
+    collectionMsg.textContent = "Failed to save collection."
+  }
+}
+
+async function saveGroup() {
+  const name = (newGroupName.value || "").trim()
+  const parentCollection = collectionSelect.value.trim()
+
+  if (!currentUser) {
+    groupMsg.textContent = "Please log in first."
+    return
+  }
+
+  if (!parentCollection || parentCollection === "__add_new__") {
+    groupMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  if (!name) {
+    groupMsg.textContent = "Please enter a group name."
+    return
+  }
+
+  try {
+    const docId = parentCollection + "__" + name
+
+    await setDoc(doc(db, "users", currentUser.uid, "groups", docId), {
+      name,
+      collection: parentCollection,
+      createdAt: serverTimestamp()
+    })
+
+    await loadGroupsFromCloud()
+    groupSelect.value = name
+    groupMsg.textContent = "Saved."
+    showPage("library")
+  } catch (error) {
+    console.error("Save group failed:", error)
+    groupMsg.textContent = "Failed to save group."
+  }
+}
+
+collectionSelect.addEventListener("change", () => {
+  if (collectionSelect.value === "__add_new__") {
+    collectionSelect.value = ""
+    showPage("addCollection")
+    return
+  }
+
+  groupSelect.value = ""
+  updateGroupState()
+})
+
+groupSelect.addEventListener("change", () => {
+  if (groupSelect.value === "__add_new__") {
+    if (!collectionSelect.value) {
+      manageMsg.textContent = "Please select a collection first."
+      groupSelect.value = ""
+      return
+    }
+
+    groupSelect.value = ""
+    showPage("addGroup")
+  }
+})
+
+function updateGroupState() {
+  const hasCollection = !!collectionSelect.value && collectionSelect.value !== "__add_new__"
+  groupSelect.disabled = !hasCollection
+
+  if (!hasCollection) {
+    groupSelect.innerHTML = `
+      <option value="">Select collection first</option>
+    `
+  } else {
+    renderGroupOptions()
+  }
+}
+
+
+function hideAllModals() {
+  modalOverlay.classList.add("isHidden")
+  renameCollectionModal.classList.add("isHidden")
+  renameGroupModal.classList.add("isHidden")
+  deleteCollectionModal.classList.add("isHidden")
+  deleteGroupModal.classList.add("isHidden")
+}
+
+function showModal(modal) {
+  hideAllModals()
+  modalOverlay.classList.remove("isHidden")
+  modal.classList.remove("isHidden")
+}
+
+function openRenameCollectionModal() {
+  if (!selectedCollectionFilter || selectedCollectionFilter === "None") {
+    manageMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  renameCollectionInput.value = selectedCollectionFilter
+  showModal(renameCollectionModal)
+  renameCollectionInput.focus()
+}
+
+function openRenameGroupModal() {
+  if (!selectedCollectionFilter || selectedCollectionFilter === "None") {
+    manageMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  if (!selectedGroupFilter) {
+    manageMsg.textContent = "Please select a group first."
+    return
+  }
+
+  renameGroupInput.value = selectedGroupFilter
+  showModal(renameGroupModal)
+  renameGroupInput.focus()
+}
+
+function openDeleteCollectionModal() {
+  if (!selectedCollectionFilter || selectedCollectionFilter === "None") {
+    manageMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  showModal(deleteCollectionModal)
+}
+
+function openDeleteGroupModal() {
+  if (!selectedCollectionFilter || selectedCollectionFilter === "None") {
+    manageMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  if (!selectedGroupFilter) {
+    manageMsg.textContent = "Please select a group first."
+    return
+  }
+
+  showModal(deleteGroupModal)
+}
+
+async function renameCollection() {
+  const oldName = selectedCollectionFilter
+  const newName = (renameCollectionInput.value || "").trim()
+
+  if (!currentUser) {
+    manageMsg.textContent = "Please log in first."
+    return
+  }
+
+  if (!oldName || oldName === "None") {
+    manageMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  if (!newName) {
+    manageMsg.textContent = "Please enter a new collection name."
+    return
+  }
+
+  if (newName === oldName) {
+    hideAllModals()
+    return
+  }
+
+  try {
+    const batch = writeBatch(db)
+
+    const oldCollectionRef = doc(db, "users", currentUser.uid, "collections", oldName)
+    const newCollectionRef = doc(db, "users", currentUser.uid, "collections", newName)
+
+    batch.set(newCollectionRef, {
+      name: newName,
+      createdAt: serverTimestamp()
+    })
+    batch.delete(oldCollectionRef)
+
+    const groupsSnap = await getDocs(query(
+      collection(db, "users", currentUser.uid, "groups"),
+      where("collection", "==", oldName)
+    ))
+
+    groupsSnap.forEach(docSnap => {
+      const data = docSnap.data()
+      const newDocId = newName + "__" + data.name
+
+      batch.set(doc(db, "users", currentUser.uid, "groups", newDocId), {
+        name: data.name,
+        collection: newName,
+        createdAt: data.createdAt || serverTimestamp()
+      })
+
+      batch.delete(doc(db, "users", currentUser.uid, "groups", docSnap.id))
+    })
+
+    const versesSnap = await getDocs(query(
+      collection(db, "users", currentUser.uid, "verses"),
+      where("collection", "==", oldName)
+    ))
+
+    versesSnap.forEach(docSnap => {
+      batch.update(doc(db, "users", currentUser.uid, "verses", docSnap.id), {
+        collection: newName
+      })
+    })
+
+    await batch.commit()
+
+    selectedCollectionFilter = newName
+    selectedGroupFilter = ""
+
+    await loadCollectionsFromCloud()
+    await loadGroupsFromCloud()
+    updateGroupState()
+    await loadVersesFromCloud()
+
+    hideAllModals()
+    manageMsg.textContent = "Collection renamed."
+  } catch (error) {
+    console.error("Rename collection failed:", error)
+    manageMsg.textContent = "Failed to rename collection."
+  }
+}
+
+async function renameGroup() {
+  const collectionName = selectedCollectionFilter
+  const oldName = selectedGroupFilter
+  const newName = (renameGroupInput.value || "").trim()
+
+  if (!currentUser) {
+    manageMsg.textContent = "Please log in first."
+    return
+  }
+
+  if (!collectionName || collectionName === "None") {
+    manageMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  if (!oldName) {
+    manageMsg.textContent = "Please select a group first."
+    return
+  }
+
+  if (!newName) {
+    manageMsg.textContent = "Please enter a new group name."
+    return
+  }
+
+  if (newName === oldName) {
+    hideAllModals()
+    return
+  }
+
+  try {
+    const batch = writeBatch(db)
+
+    const oldDocId = collectionName + "__" + oldName
+    const newDocId = collectionName + "__" + newName
+
+    batch.set(doc(db, "users", currentUser.uid, "groups", newDocId), {
+      name: newName,
+      collection: collectionName,
+      createdAt: serverTimestamp()
+    })
+
+    batch.delete(doc(db, "users", currentUser.uid, "groups", oldDocId))
+
+    const versesSnap = await getDocs(query(
+      collection(db, "users", currentUser.uid, "verses"),
+      where("collection", "==", collectionName),
+      where("group", "==", oldName)
+    ))
+
+    versesSnap.forEach(docSnap => {
+      batch.update(doc(db, "users", currentUser.uid, "verses", docSnap.id), {
+        group: newName
+      })
+    })
+
+    await batch.commit()
+
+    selectedGroupFilter = newName
+
+    await loadGroupsFromCloud()
+    await loadVersesFromCloud()
+
+    hideAllModals()
+    manageMsg.textContent = "Group renamed."
+  } catch (error) {
+    console.error("Rename group failed:", error)
+    manageMsg.textContent = "Failed to rename group."
+  }
+}
+
+async function deleteSelectedCollection() {
+  const collectionName = selectedCollectionFilter
+
+  if (!currentUser) {
+    manageMsg.textContent = "Please log in first."
+    return
+  }
+
+  if (!collectionName || collectionName === "None") {
+    manageMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  try {
+    const batch = writeBatch(db)
+
+    batch.delete(doc(db, "users", currentUser.uid, "collections", collectionName))
+
+    const groupsSnap = await getDocs(query(
+      collection(db, "users", currentUser.uid, "groups"),
+      where("collection", "==", collectionName)
+    ))
+
+    groupsSnap.forEach(docSnap => {
+      batch.delete(doc(db, "users", currentUser.uid, "groups", docSnap.id))
+    })
+
+    const versesSnap = await getDocs(query(
+      collection(db, "users", currentUser.uid, "verses"),
+      where("collection", "==", collectionName)
+    ))
+
+    versesSnap.forEach(docSnap => {
+      batch.update(doc(db, "users", currentUser.uid, "verses", docSnap.id), {
+        collection: "None",
+        group: ""
+      })
+    })
+
+    await batch.commit()
+
+    selectedCollectionFilter = "None"
+    selectedGroupFilter = ""
+
+    await loadCollectionsFromCloud()
+    await loadGroupsFromCloud()
+    updateGroupState()
+    await loadVersesFromCloud()
+
+    hideAllModals()
+    manageMsg.textContent = "Collection deleted."
+  } catch (error) {
+    console.error("Delete collection failed:", error)
+    manageMsg.textContent = "Failed to delete collection."
+  }
+}
+
+async function deleteSelectedGroup() {
+  const collectionName = selectedCollectionFilter
+  const groupName = selectedGroupFilter
+
+  if (!currentUser) {
+    manageMsg.textContent = "Please log in first."
+    return
+  }
+
+  if (!collectionName || collectionName === "None") {
+    manageMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  if (!groupName) {
+    manageMsg.textContent = "Please select a group first."
+    return
+  }
+
+  try {
+    const batch = writeBatch(db)
+
+    const docId = collectionName + "__" + groupName
+    batch.delete(doc(db, "users", currentUser.uid, "groups", docId))
+
+    const versesSnap = await getDocs(query(
+      collection(db, "users", currentUser.uid, "verses"),
+      where("collection", "==", collectionName),
+      where("group", "==", groupName)
+    ))
+
+    versesSnap.forEach(docSnap => {
+      batch.update(doc(db, "users", currentUser.uid, "verses", docSnap.id), {
+        group: ""
+      })
+    })
+
+    await batch.commit()
+
+    selectedGroupFilter = ""
+
+    await loadGroupsFromCloud()
+    await loadVersesFromCloud()
+
+    hideAllModals()
+    manageMsg.textContent = "Group deleted."
+  } catch (error) {
+    console.error("Delete group failed:", error)
+    manageMsg.textContent = "Failed to delete group."
+  }
+}
+
+btnAddCollectionInline.addEventListener("click", () => showPage("addCollection"))
+btnAddGroupInline.addEventListener("click", () => {
+  if (!selectedCollectionFilter || selectedCollectionFilter === "None") {
+    manageMsg.textContent = "Please select a collection first."
+    return
+  }
+
+  collectionSelect.value = selectedCollectionFilter
+  renderGroupOptions()
+  showPage("addGroup")
+})
+
+btnRenameCollectionInline.addEventListener("click", openRenameCollectionModal)
+btnRenameGroupInline.addEventListener("click", openRenameGroupModal)
+
+btnDeleteCollectionInline.addEventListener("click", openDeleteCollectionModal)
+btnDeleteGroupInline.addEventListener("click", openDeleteGroupModal)
+
+btnSaveRenameCollection.addEventListener("click", renameCollection)
+btnCancelRenameCollection.addEventListener("click", hideAllModals)
+
+btnSaveRenameGroup.addEventListener("click", renameGroup)
+btnCancelRenameGroup.addEventListener("click", hideAllModals)
+
+btnConfirmDeleteCollection.addEventListener("click", deleteSelectedCollection)
+btnCancelDeleteCollection.addEventListener("click", hideAllModals)
+
+btnConfirmDeleteGroup.addEventListener("click", deleteSelectedGroup)
+btnCancelDeleteGroup.addEventListener("click", hideAllModals)
+
+modalOverlay.addEventListener("click", (event) => {
+  if (event.target === modalOverlay) {
+    hideAllModals()
+  }
+})
+
+btnSaveCollection.addEventListener("click", saveCollection)
+btnCancelCollection.addEventListener("click", () => showPage("library"))
+
+btnSaveGroup.addEventListener("click", saveGroup)
+btnCancelGroup.addEventListener("click", () => showPage("library"))
 
 btnBackToGame.addEventListener("click", () => {
   openGamePicker(selectedVerseId)

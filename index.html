@@ -136,6 +136,22 @@
                 </div>
 
                 <div class="row">
+                    <label for="collectionSelect">Collection</label>
+                    <select id="collectionSelect">
+                        <option value="">Select collection</option>
+                        <option value="__add_new__">+ Add new collection</option>
+                    </select>
+                </div>
+
+                <div class="row">
+                    <label for="groupSelect">Group</label>
+                    <select id="groupSelect">
+                        <option value="">Select group</option>
+                        <option value="__add_new__">+ Add new group</option>
+                    </select>
+                </div>
+
+                <div class="row">
                     <label for="newTitle">Title (optional)</label>
                     <input id="newTitle" type="text" placeholder="Example: God's Faithfulness">
                 </div>
@@ -165,16 +181,77 @@
                     <button id="btnClearVerse" type="button" class="ghost">Clear</button>
                 </div>
 
-
-
                 <div class="result" id="ManageMsg"></div>
 
                 <hr class="sep">
+
+                <div id="libraryFilters">
+                    <div class="row">
+                        <label>Collection</label>
+                        <div class="controls" id="collectionFilters"></div>
+                        <div class="miniActions">
+                            <button type="button" id="btnAddCollectionInline" class="linkBtn">➕ Add Collection</button>
+                            <button type="button" id="btnRenameCollectionInline" class="linkBtn">📝 Rename
+                                Collection</button>
+                            <button type="button" id="btnDeleteCollectionInline" class="linkBtn dangerLink">🗑️ Delete
+                                Collection</button>
+                        </div>
+                    </div>
+
+                    <br>
+
+                    <div class="row">
+                        <label>Group</label>
+                        <div class="controls" id="groupFilters"></div>
+                        <div class="miniActions">
+                            <button type="button" id="btnAddGroupInline" class="linkBtn">➕ Add Group</button>
+                            <button type="button" id="btnRenameGroupInline" class="linkBtn">📝 Rename Group</button>
+                            <button type="button" id="btnDeleteGroupInline" class="linkBtn dangerLink">🗑️ Delete
+                                Group</button>
+                        </div>
+                    </div>
+                </div>
+
+                <br>
 
                 <div id="libraryGrid"></div>
 
             </section>
 
+        </section>
+
+        <section id="pageAddCollection" class="isHidden">
+            <section class="card">
+                <h2>Add A New Collection</h2>
+
+                <div class="row">
+                    <input id="newCollectionName" type="text" placeholder="Example: Navigators">
+                </div>
+
+                <div class="controls">
+                    <button id="btnSaveCollection" type="button">Save</button>
+                    <button id="btnCancelCollection" type="button" class="ghost">Cancel</button>
+                </div>
+
+                <div class="result" id="collectionMsg"></div>
+            </section>
+        </section>
+
+        <section id="pageAddGroup" class="isHidden">
+            <section class="card">
+                <h2>Add A New Group</h2>
+
+                <div class="row">
+                    <input id="newGroupName" type="text" placeholder="Example: Proclaiming Christ">
+                </div>
+
+                <div class="controls">
+                    <button id="btnSaveGroup" type="button">Save</button>
+                    <button id="btnCancelGroup" type="button" class="ghost">Cancel</button>
+                </div>
+
+                <div class="result" id="groupMsg"></div>
+            </section>
         </section>
 
         <section id="pageGame" class="isHidden">
@@ -231,7 +308,47 @@
 
         </section>
 
+        <div id="modalOverlay" class="modalOverlay isHidden">
+            <div class="modalCard isHidden" id="renameCollectionModal">
+                <h3>Rename Collection</h3>
+                <div class="row">
+                    <input id="renameCollectionInput" type="text" placeholder="Enter new collection name">
+                </div>
+                <div class="controls">
+                    <button id="btnSaveRenameCollection" type="button">Save</button>
+                    <button id="btnCancelRenameCollection" type="button" class="ghost">Cancel</button>
+                </div>
+            </div>
 
+            <div class="modalCard isHidden" id="renameGroupModal">
+                <h3>Rename Group</h3>
+                <div class="row">
+                    <input id="renameGroupInput" type="text" placeholder="Enter new group name">
+                </div>
+                <div class="controls">
+                    <button id="btnSaveRenameGroup" type="button">Save</button>
+                    <button id="btnCancelRenameGroup" type="button" class="ghost">Cancel</button>
+                </div>
+            </div>
+
+            <div class="modalCard isHidden" id="deleteCollectionModal">
+                <h3>Delete Collection</h3>
+                <p>Are you sure you want to delete this collection?</p>
+                <div class="controls">
+                    <button id="btnConfirmDeleteCollection" type="button" class="danger">Yes</button>
+                    <button id="btnCancelDeleteCollection" type="button" class="ghost">No</button>
+                </div>
+            </div>
+
+            <div class="modalCard isHidden" id="deleteGroupModal">
+                <h3>Delete Group</h3>
+                <p>Are you sure you want to delete this group?</p>
+                <div class="controls">
+                    <button id="btnConfirmDeleteGroup" type="button" class="danger">Yes</button>
+                    <button id="btnCancelDeleteGroup" type="button" class="ghost">No</button>
+                </div>
+            </div>
+        </div>
 
         <footer class="foot">
             Saved in your account

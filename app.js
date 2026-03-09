@@ -101,6 +101,7 @@ const newRef = document.getElementById("newRef")
 const newText = document.getElementById("newText")
 const manageMsg = document.getElementById("ManageMsg")
 const btnSaveVerse = document.getElementById("btnSaveVerse")
+const btnClearVerse = document.getElementById("btnClearVerse")
 const libraryGrid = document.getElementById("libraryGrid")
 
 const themeSelect = document.getElementById("themeSelect")
@@ -1247,6 +1248,35 @@ async function saveNewVerse() {
   }
 }
 
+function clearVerseForm() {
+  const hasContent =
+    pasteBox.value.trim() ||
+    newTitle.value.trim() ||
+    newRef.value.trim() ||
+    newVersion.value.trim() ||
+    newText.value.trim()
+
+  if (!hasContent) {
+    manageMsg.textContent = "Nothing to clear."
+    pasteBox.focus()
+    return
+  }
+
+  const confirmed = window.confirm("Clear all verse fields?")
+
+  if (!confirmed) {
+    return
+  }
+
+  pasteBox.value = ""
+  newTitle.value = ""
+  newRef.value = ""
+  newVersion.value = ""
+  newText.value = ""
+  manageMsg.textContent = "Cleared."
+  pasteBox.focus()
+}
+
 async function deleteCustomVerse(id) {
   if (!currentUser) {
     manageMsg.textContent = "Please log in first."
@@ -1422,6 +1452,7 @@ btnCheck.addEventListener("click", checkCurrentMode)
 btnAutoFill.addEventListener("click", autoFillFromPastedText)
 
 btnSaveVerse.addEventListener("click", saveNewVerse)
+btnClearVerse.addEventListener("click", clearVerseForm)
 btnBackToLibrary.addEventListener("click", () => showPage("library"))
 
 btnLogin.addEventListener("click", loginWithGoogle)

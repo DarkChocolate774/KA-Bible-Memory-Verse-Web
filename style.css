@@ -528,3 +528,7 @@ textarea:disabled {
 .modalCard p {
   margin: 0 0 18px;
 }
+
+.modalCard select {
+  margin-top: 4px;
+}

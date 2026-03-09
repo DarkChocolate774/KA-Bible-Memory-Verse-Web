@@ -61,6 +61,7 @@ let collections = []
 let groups = []
 let selectedCollectionFilter = "None"
 let selectedGroupFilter = ""
+let moveVerseId = ""
 
 const btnLogin = document.getElementById("btnLogin")
 const btnLogout = document.getElementById("btnLogout")
@@ -184,6 +185,12 @@ const btnConfirmDeleteCollection = document.getElementById("btnConfirmDeleteColl
 const btnCancelDeleteCollection = document.getElementById("btnCancelDeleteCollection")
 const btnConfirmDeleteGroup = document.getElementById("btnConfirmDeleteGroup")
 const btnCancelDeleteGroup = document.getElementById("btnCancelDeleteGroup")
+
+const moveVerseModal = document.getElementById("moveVerseModal")
+const moveVerseCollectionSelect = document.getElementById("moveVerseCollectionSelect")
+const moveVerseGroupSelect = document.getElementById("moveVerseGroupSelect")
+const btnSaveMoveVerse = document.getElementById("btnSaveMoveVerse")
+const btnCancelMoveVerse = document.getElementById("btnCancelMoveVerse")
 
 let currentUser = null
 
@@ -1308,6 +1315,15 @@ function renderLibrary() {
       openGamePicker(verse.id)
     })
 
+    const moveBtn = document.createElement("button")
+    moveBtn.type = "button"
+    moveBtn.className = "ghost"
+    moveBtn.textContent = "Move 📁"
+    moveBtn.addEventListener("click", event => {
+      event.stopPropagation()
+      openMoveVerseModal(verse)
+    })
+
     const delBtn = document.createElement("button")
     delBtn.type = "button"
     delBtn.className = "danger"
@@ -1318,6 +1334,7 @@ function renderLibrary() {
     })
 
     actions.appendChild(playBtn)
+    actions.appendChild(moveBtn)
     actions.appendChild(delBtn)
 
     card.appendChild(meta)
@@ -1809,6 +1826,7 @@ function hideAllModals() {
   renameGroupModal.classList.add("isHidden")
   deleteCollectionModal.classList.add("isHidden")
   deleteGroupModal.classList.add("isHidden")
+  moveVerseModal.classList.add("isHidden")
 }
 
 function showModal(modal) {
@@ -2130,6 +2148,87 @@ async function deleteSelectedGroup() {
   }
 }
 
+function renderMoveVerseCollectionOptions(selectedValue = "None") {
+  if (!moveVerseCollectionSelect) return
+
+  const collectionNames = ["None", ...collections.map(item => item.name).filter(name => name !== "None")]
+
+  moveVerseCollectionSelect.innerHTML = collectionNames
+    .map(name => `<option value="${name}">${name}</option>`)
+    .join("")
+
+  moveVerseCollectionSelect.value = collectionNames.includes(selectedValue) ? selectedValue : "None"
+}
+
+function renderMoveVerseGroupOptions(collectionName, selectedValue = "") {
+  if (!moveVerseGroupSelect) return
+
+  if (!collectionName || collectionName === "None") {
+    moveVerseGroupSelect.innerHTML = `<option value="">No group</option>`
+    moveVerseGroupSelect.value = ""
+    return
+  }
+
+  const filteredGroups = groups.filter(item => item.collection === collectionName)
+
+  moveVerseGroupSelect.innerHTML = `
+    <option value="">No group</option>
+    ${filteredGroups.map(item => `<option value="${item.name}">${item.name}</option>`).join("")}
+  `
+
+  moveVerseGroupSelect.value =
+    selectedValue && filteredGroups.some(item => item.name === selectedValue)
+      ? selectedValue
+      : ""
+}
+
+function openMoveVerseModal(verse) {
+  moveVerseId = verse.id
+
+  const currentCollection = verse.collection || "None"
+  const currentGroup = verse.group || ""
+
+  renderMoveVerseCollectionOptions(currentCollection)
+  renderMoveVerseGroupOptions(currentCollection, currentGroup)
+
+  showModal(moveVerseModal)
+}
+
+async function saveMoveVerse() {
+  if (!currentUser) {
+    manageMsg.textContent = "Please log in first."
+    return
+  }
+
+  if (!moveVerseId) {
+    manageMsg.textContent = "No verse selected."
+    return
+  }
+
+  const newCollection = moveVerseCollectionSelect.value || "None"
+  const newGroup = newCollection === "None" ? "" : (moveVerseGroupSelect.value || "")
+
+  try {
+    await updateDoc(doc(db, "users", currentUser.uid, "verses", moveVerseId), {
+      collection: newCollection,
+      group: newGroup
+    })
+
+    moveVerseId = ""
+    hideAllModals()
+    await loadVersesFromCloud()
+    manageMsg.textContent = "Verse moved."
+  } catch (error) {
+    console.error("Move verse failed:", error)
+    manageMsg.textContent = "Failed to move verse."
+  }
+}
+
+moveVerseCollectionSelect.addEventListener("change", () => {
+  const selectedCollection = moveVerseCollectionSelect.value || "None"
+  renderMoveVerseGroupOptions(selectedCollection, "")
+})
+
 btnAddCollectionInline.addEventListener("click", () => showPage("addCollection"))
 btnAddGroupInline.addEventListener("click", () => {
   if (!selectedCollectionFilter || selectedCollectionFilter === "None") {
@@ -2197,6 +2296,9 @@ tabSettings.addEventListener("click", () => showPage("settings"))
 modeType.addEventListener("click", () => startSelectedGame("type"))
 modeDrag.addEventListener("click", () => startSelectedGame("drag"))
 modeLetters.addEventListener("click", () => startSelectedGame("letters"))
+
+btnSaveMoveVerse.addEventListener("click", saveMoveVerse)
+btnCancelMoveVerse.addEventListener("click", hideAllModals)
 
 pasteBox.addEventListener("paste", () => {
   setTimeout(autoFillFromPastedText, 0)

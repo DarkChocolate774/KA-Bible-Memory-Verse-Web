@@ -1,3 +1,11 @@
+// Global error catcher — logs any crash to console so we can see it in DevTools
+window.addEventListener("error", (e) => {
+  console.error("[CRASH] Uncaught error:", e.message, "at", e.filename, e.lineno)
+})
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("[CRASH] Unhandled promise rejection:", e.reason)
+})
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"
 
 import {
@@ -1261,6 +1269,11 @@ let _filterBusy = false
 let _collectionFiltersCacheKey = null
 let _groupFiltersCacheKey = null
 
+// Timestamp of the last filter button rebuild. Android Chrome fires synthetic
+// ghost clicks on newly inserted DOM elements — we ignore any click that arrives
+// within 600ms of a rebuild to break the infinite re-render loop.
+let _lastFilterRebuildTime = 0
+
 function renderCollectionFilters() {
   if (!collectionFilters) return
 
@@ -1271,6 +1284,7 @@ function renderCollectionFilters() {
   if (cacheKey === _collectionFiltersCacheKey) return
   _collectionFiltersCacheKey = cacheKey
 
+  _lastFilterRebuildTime = Date.now()
   collectionFilters.innerHTML = ""
   const frag = document.createDocumentFragment()
   collectionNames.forEach(name => {
@@ -1279,26 +1293,16 @@ function renderCollectionFilters() {
     btn.className = name === selectedCollectionFilter ? "tab active" : "tab"
     btn.textContent = name
     btn.addEventListener("click", () => {
+      // Block Android ghost taps fired on newly inserted buttons
+      if (Date.now() - _lastFilterRebuildTime < 600) return
       if (_filterBusy) return
       _filterBusy = true
-      const _tapT0 = performance.now()
       selectedCollectionFilter = name
       selectedGroupFilter = ""
       _collectionFiltersCacheKey = null
       _groupFiltersCacheKey = null
       renderLibrary()
-      const _tapT1 = performance.now()
-      console.log(`[TAP] renderLibrary() call took ${(_tapT1-_tapT0).toFixed(1)}ms`)
-      setTimeout(() => {
-        const _tapT2 = performance.now()
-        console.log(`[TAP] after setTimeout: ${(_tapT2-_tapT0).toFixed(1)}ms total since tap`)
-        _filterBusy = false
-      }, 0)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          console.log(`[TAP] after 2x rAF: ${(performance.now()-_tapT0).toFixed(1)}ms — paint should be done`)
-        })
-      })
+      setTimeout(() => { _filterBusy = false }, 0)
     })
     frag.appendChild(btn)
   })
@@ -1318,6 +1322,7 @@ function renderGroupFilters() {
   if (cacheKey === _groupFiltersCacheKey) return
   _groupFiltersCacheKey = cacheKey
 
+  _lastFilterRebuildTime = Date.now()
   groupFilters.innerHTML = ""
   if (availableGroups.length === 0) return
 
@@ -1328,6 +1333,8 @@ function renderGroupFilters() {
     btn.className = item.name === selectedGroupFilter ? "tab active" : "tab"
     btn.textContent = item.name
     btn.addEventListener("click", () => {
+      // Block ghost taps fired by Android Chrome on newly inserted buttons
+      if (Date.now() - _lastFilterRebuildTime < 600) return
       if (_filterBusy) return
       _filterBusy = true
       selectedGroupFilter = selectedGroupFilter === item.name ? "" : item.name
@@ -1402,15 +1409,10 @@ function _ensureLibraryDelegation() {
 }
 
 function _renderLibraryNow() {
-  const _t0 = performance.now()
   refreshVerses()
   _ensureLibraryDelegation()
-
-  const _t1 = performance.now()
   renderCollectionFilters()
-  const _t2 = performance.now()
   renderGroupFilters()
-  const _t3 = performance.now()
 
   libraryGrid.innerHTML = ""
 
@@ -1491,10 +1493,7 @@ function _renderLibraryNow() {
     fragment.appendChild(card)
   })
 
-  const _t4 = performance.now()
   libraryGrid.appendChild(fragment)
-  const _t5 = performance.now()
-  console.log(`[PERF] renderLibraryNow total=${(_t5-_t0).toFixed(1)}ms | collFilters=${(_t2-_t1).toFixed(1)}ms | grpFilters=${(_t3-_t2).toFixed(1)}ms | gridBuild=${(_t4-_t3).toFixed(1)}ms | domInsert=${(_t5-_t4).toFixed(1)}ms`)
 
   // Signal the delegated listener that the grid was just rebuilt so it can
   // ignore the next ghost tap from Android Chrome's 300 ms click delay.

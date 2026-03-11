@@ -275,19 +275,16 @@ onAuthStateChanged(auth, async (user) => {
 })
 
 async function loadVersesFromCloud() {
+  if (_isLoadingVerses) return
+
   if (!currentUser) {
     verses = []
     renderLibrary()
     return
   }
 
-  // Prevent overlapping fetches — a second call while one is in flight
-  // causes two renderLibrary() calls back-to-back, which on Android Chrome
-  // causes layout thrashing and freezes.
   _isLoadingVerses = true
 
-  // Show a subtle loading hint so the user doesn't tap again thinking
-  // nothing happened (a major cause of cascading crashes on mobile).
   if (libraryGrid) {
     libraryGrid.innerHTML = "<div style='padding:12px;color:var(--muted);'>Loading…</div>"
   }
@@ -312,14 +309,11 @@ async function loadVersesFromCloud() {
     })
 
     verses = DEFAULT_VERSES.concat(cloudVerses)
-    // Rebuild filter buttons now that we have fresh data, then render cards.
     renderCollectionFilters()
     renderGroupFilters()
     renderLibrary()
 
     if (verses.length > 0) {
-      // Only auto-load a verse if none is currently selected, to avoid
-      // resetting the user's selection on every background reload.
       const idToLoad = (selectedVerseId && verses.some(v => v.id === selectedVerseId))
         ? selectedVerseId
         : verses[0].id

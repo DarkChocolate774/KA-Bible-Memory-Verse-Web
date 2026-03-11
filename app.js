@@ -1228,40 +1228,21 @@ function renderCollectionFilters() {
   collectionFilters.innerHTML = ""
 
   const collectionNames = ["None", ...collections.map(c => c.name).filter(n => n !== "None")]
+  const frag = document.createDocumentFragment()
 
   collectionNames.forEach(name => {
     const btn = document.createElement("button")
     btn.type = "button"
     btn.className = name === selectedCollectionFilter ? "tab active" : "tab"
     btn.textContent = name
-    
+    btn.dataset.collection = name
     btn.style.touchAction = "manipulation"
     btn.style.userSelect = "none"
 
-    btn.addEventListener("click", () => {
-
-      if (_filterBusy) return
-
-      if (selectedCollectionFilter === name) return
-
-      _filterBusy = true
-
-      selectedCollectionFilter = name
-      selectedGroupFilter = ""
-
-      _collectionFiltersCacheKey = null
-      _groupFiltersCacheKey = null
-
-      renderLibrary()
-
-      setTimeout(() => {
-        _filterBusy = false
-      }, 300)
-
-    })
-
     frag.appendChild(btn)
   })
+
+  collectionFilters.appendChild(frag)
 }
 
 function renderGroupFilters() {

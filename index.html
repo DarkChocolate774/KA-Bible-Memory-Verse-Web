@@ -417,34 +417,68 @@
 
     </main>
 
-    <!-- Error overlay — catches JS crashes that silently white-out the page
-         on Android Chrome (ES module errors are not shown by default).
-         Shows the error message on screen so we can diagnose it.
-         REMOVE THIS BLOCK once the bug is identified and fixed. -->
-    <div id="errOverlay" style="
-        display:none;position:fixed;inset:0;z-index:9999;
-        background:rgba(0,0,0,0.92);color:#fff;padding:24px;
-        font-family:monospace;font-size:14px;overflow:auto;
-        white-space:pre-wrap;word-break:break-word;">
-      <strong style="font-size:16px;">⚠️ App Error (debug mode)</strong>
-      <div id="errMsg" style="margin-top:12px;"></div>
-      <button onclick="document.getElementById('errOverlay').style.display='none'"
-        style="margin-top:16px;padding:10px 18px;background:#fff;color:#000;
-               border:none;border-radius:8px;font-size:14px;cursor:pointer;">
-        Dismiss
-      </button>
+    <!-- ============================================================
+         DEBUG PANEL — shows errors AND live logs on screen.
+         Replace both index.html and app.js, then reproduce the
+         freeze on your phone and screenshot the debug panel.
+         REMOVE this entire block once the bug is fixed.
+         ============================================================ -->
+    <div id="dbgPanel" style="
+        position:fixed;bottom:0;left:0;right:0;z-index:9999;
+        background:rgba(0,0,0,0.88);color:#0f0;
+        font-family:monospace;font-size:12px;
+        max-height:40vh;overflow-y:auto;
+        padding:8px;border-top:2px solid #0f0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <strong style="color:#fff;">🐛 Debug Log</strong>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('dbgLog').innerHTML=''"
+            style="padding:4px 10px;background:#333;color:#fff;border:1px solid #666;border-radius:4px;font-size:11px;cursor:pointer;">
+            Clear
+          </button>
+          <button onclick="document.getElementById('dbgPanel').style.display='none'"
+            style="padding:4px 10px;background:#333;color:#fff;border:1px solid #666;border-radius:4px;font-size:11px;cursor:pointer;">
+            Hide
+          </button>
+        </div>
+      </div>
+      <div id="dbgLog"></div>
     </div>
     <script>
-      function _showErr(msg) {
-        document.getElementById("errMsg").textContent = msg;
-        document.getElementById("errOverlay").style.display = "block";
+      // window.dbg() — call from anywhere in app.js to log to the panel
+      const _dbgLog = document.getElementById("dbgLog")
+      let _dbgCount = 0
+      window.dbg = function(msg) {
+        _dbgCount++
+        // Stop logging after 200 lines to prevent the panel itself from
+        // causing a freeze if something loops
+        if (_dbgCount > 200) {
+          if (_dbgCount === 201) {
+            const stop = document.createElement("div")
+            stop.style.color = "#f00"
+            stop.textContent = "⛔ Log limit reached — possible infinite loop above this line"
+            _dbgLog.appendChild(stop)
+          }
+          return
+        }
+        const line = document.createElement("div")
+        line.style.borderBottom = "1px solid #1a1a1a"
+        line.style.padding = "2px 0"
+        line.style.color = String(msg).startsWith("ERR") ? "#f66" :
+                           String(msg).startsWith("WARN") ? "#fa0" : "#0f0"
+        line.textContent = _dbgCount + ". " + msg
+        _dbgLog.appendChild(line)
+        _dbgLog.scrollTop = _dbgLog.scrollHeight
       }
+      // Catch JS errors
       window.addEventListener("error", function(e) {
-        _showErr((e.message || "Unknown error") + "\n\nFile: " + (e.filename || "") + "\nLine: " + e.lineno + "\nCol: " + e.colno + (e.error && e.error.stack ? "\n\n" + e.error.stack : ""));
-      });
+        window.dbg("ERR: " + (e.message || "?") + " [line " + e.lineno + "]")
+      })
+      // Catch unhandled promise rejections
       window.addEventListener("unhandledrejection", function(e) {
-        _showErr("Unhandled Promise Rejection:\n" + (e.reason && e.reason.stack ? e.reason.stack : String(e.reason)));
-      });
+        window.dbg("ERR (promise): " + (e.reason && e.reason.message ? e.reason.message : String(e.reason)))
+      })
+      window.dbg("Page loaded")
     </script>
     <script type="module" src="app.js"></script>
 

@@ -278,7 +278,8 @@ async function loadVersesFromCloud() {
   // Prevent overlapping fetches — a second call while one is in flight
   // causes two renderLibrary() calls back-to-back, which on Android Chrome
   // causes layout thrashing and freezes.
-  if (_isLoadingVerses) return
+  window.dbg && window.dbg("loadVersesFromCloud() called")
+  if (_isLoadingVerses) { window.dbg && window.dbg("WARN: loadVersesFromCloud skipped — already loading"); return }
   _isLoadingVerses = true
 
   // Show a subtle loading hint so the user doesn't tap again thinking
@@ -1267,6 +1268,7 @@ function _ensureCollectionFilterDelegation() {
   collectionFilters.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-collection]")
     if (!btn) return
+    window.dbg && window.dbg("Collection tab tapped: " + btn.dataset.collection)
     selectedCollectionFilter = btn.dataset.collection
     selectedGroupFilter = ""
     renderLibrary()
@@ -1285,6 +1287,7 @@ function _ensureGroupFilterDelegation() {
 }
 
 function renderCollectionFilters() {
+  window.dbg && window.dbg("renderCollectionFilters() called")
   if (!collectionFilters) return
   _ensureCollectionFilterDelegation()
 
@@ -1317,6 +1320,7 @@ function renderCollectionFilters() {
 }
 
 function renderGroupFilters() {
+  window.dbg && window.dbg("renderGroupFilters() called — selected: " + selectedCollectionFilter)
   if (!groupFilters) return
   _ensureGroupFilterDelegation()
 
@@ -1358,10 +1362,8 @@ function renderGroupFilters() {
 let _libraryRenderPending = false
 
 function renderLibrary() {
-  // Debounce rapid calls into a single animation frame to prevent
-  // layout thrashing on Android Chrome (caused by back-to-back deletes,
-  // filter taps, and post-import reloads all hammering the DOM).
-  if (_libraryRenderPending) return
+  window.dbg && window.dbg("renderLibrary() called")
+  if (_libraryRenderPending) { window.dbg && window.dbg("WARN: renderLibrary() skipped — already pending"); return }
   _libraryRenderPending = true
   requestAnimationFrame(() => {
     _libraryRenderPending = false
@@ -1421,6 +1423,7 @@ function _ensureLibraryDelegation() {
 }
 
 function _renderLibraryNow() {
+  window.dbg && window.dbg("_renderLibraryNow() start — verses: " + verses.length + ", collection: " + selectedCollectionFilter)
   refreshVerses()
   _ensureLibraryDelegation()
 

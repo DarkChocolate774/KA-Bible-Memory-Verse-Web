@@ -1281,13 +1281,24 @@ function renderCollectionFilters() {
     btn.addEventListener("click", () => {
       if (_filterBusy) return
       _filterBusy = true
+      const _tapT0 = performance.now()
       selectedCollectionFilter = name
       selectedGroupFilter = ""
-      // Invalidate cache so next renderLibrary() rebuilds with new active state
       _collectionFiltersCacheKey = null
       _groupFiltersCacheKey = null
       renderLibrary()
-      setTimeout(() => { _filterBusy = false }, 0)
+      const _tapT1 = performance.now()
+      console.log(`[TAP] renderLibrary() call took ${(_tapT1-_tapT0).toFixed(1)}ms`)
+      setTimeout(() => {
+        const _tapT2 = performance.now()
+        console.log(`[TAP] after setTimeout: ${(_tapT2-_tapT0).toFixed(1)}ms total since tap`)
+        _filterBusy = false
+      }, 0)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          console.log(`[TAP] after 2x rAF: ${(performance.now()-_tapT0).toFixed(1)}ms — paint should be done`)
+        })
+      })
     })
     frag.appendChild(btn)
   })

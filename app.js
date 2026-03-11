@@ -59,7 +59,7 @@ let tapDifficulty = "easy"
 
 let collections = []
 let groups = []
-let selectedCollectionFilter = "All"
+let selectedCollectionFilter = ""
 let selectedGroupFilter = ""
 let moveVerseId = ""
 let isRenderingLibrary = false
@@ -1227,15 +1227,40 @@ function renderCollectionFilters() {
 
   collectionFilters.innerHTML = ""
 
-  const collectionNames = ["All", "None", ...collections.map(item => item.name).filter(name => name !== "None")]
+  const collectionNames = ["None", ...collections.map(c => c.name).filter(n => n !== "None")]
 
   collectionNames.forEach(name => {
     const btn = document.createElement("button")
     btn.type = "button"
-    btn.className = selectedCollectionFilter === name ? "tab active" : "tab"
+    btn.className = name === selectedCollectionFilter ? "tab active" : "tab"
     btn.textContent = name
-    btn.dataset.collection = name
-    collectionFilters.appendChild(btn)
+    
+    btn.style.touchAction = "manipulation"
+    btn.style.userSelect = "none"
+
+    btn.addEventListener("click", () => {
+
+      if (_filterBusy) return
+
+      if (selectedCollectionFilter === name) return
+
+      _filterBusy = true
+
+      selectedCollectionFilter = name
+      selectedGroupFilter = ""
+
+      _collectionFiltersCacheKey = null
+      _groupFiltersCacheKey = null
+
+      renderLibrary()
+
+      setTimeout(() => {
+        _filterBusy = false
+      }, 300)
+
+    })
+
+    frag.appendChild(btn)
   })
 }
 
@@ -1244,11 +1269,9 @@ function renderGroupFilters() {
 
   groupFilters.innerHTML = ""
 
-  if (!selectedCollectionFilter || selectedCollectionFilter === "All" || selectedCollectionFilter === "None") {
-    return
-  }
+  if (!selectedCollectionFilter || selectedCollectionFilter === "None") return
 
-  const availableGroups = groups.filter(item => item.collection === selectedCollectionFilter)
+  const availableGroups = groups.filter(g => g.collection === selectedCollectionFilter)
 
   availableGroups.forEach(item => {
     const btn = document.createElement("button")
@@ -1256,6 +1279,7 @@ function renderGroupFilters() {
     btn.className = selectedGroupFilter === item.name ? "tab active" : "tab"
     btn.textContent = item.name
     btn.dataset.group = item.name
+
     groupFilters.appendChild(btn)
   })
 }
@@ -1287,20 +1311,21 @@ function _renderLibraryNow() {
 
   libraryGrid.innerHTML = ""
 
-  let filteredVerses = verses.filter(verse => {
-    const verseCollection = verse.collection || "None"
-    const verseGroup = verse.group || ""
+  let filteredVerses = verses.slice()
 
-    const collectionMatch =
-      selectedCollectionFilter === "All" ||
-      selectedCollectionFilter === verseCollection
+  if (selectedCollectionFilter) {
+    filteredVerses = filteredVerses.filter(
+      verse => (verse.collection || "None") === selectedCollectionFilter
+    )
+  }
 
-    const groupMatch =
-      !selectedGroupFilter ||
-      selectedGroupFilter === verseGroup
+  if (selectedGroupFilter) {
+    filteredVerses = filteredVerses.filter(
+      verse => verse.group === selectedGroupFilter
+    )
+  }
 
-    return collectionMatch && groupMatch
-  })
+  filteredVerses = filteredVerses.slice(0, 100)
 
   if (filteredVerses.length === 0) {
     libraryGrid.innerHTML = `<div class="result">No verses found.</div>`

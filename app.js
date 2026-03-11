@@ -1248,54 +1248,95 @@ function startSelectedGame(mode) {
   showPage("practice")
 }
 
+// ---------------------------------------------------------------------------
+// Collection & group filter bars — event delegation.
+// Previously every renderCollectionFilters / renderGroupFilters call wiped
+// innerHTML and re-attached a click listener per button. Because these are
+// called from inside _renderLibraryNow, tapping a collection tab caused:
+//   tap → renderGroupFilters() + renderLibrary()
+//          └─ _renderLibraryNow → renderCollectionFilters() + renderGroupFilters() again
+// = double listener registration + double CSS transition repaint on Android.
+// Now listeners are attached once; rebuilds only swap text/class, no new listeners.
+// ---------------------------------------------------------------------------
+let _collectionDelegationReady = false
+let _groupDelegationReady = false
+
+function _ensureCollectionFilterDelegation() {
+  if (_collectionDelegationReady) return
+  _collectionDelegationReady = true
+  collectionFilters.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-collection]")
+    if (!btn) return
+    selectedCollectionFilter = btn.dataset.collection
+    selectedGroupFilter = ""
+    renderLibrary()
+  })
+}
+
+function _ensureGroupFilterDelegation() {
+  if (_groupDelegationReady) return
+  _groupDelegationReady = true
+  groupFilters.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-group]")
+    if (!btn) return
+    selectedGroupFilter = selectedGroupFilter === btn.dataset.group ? "" : btn.dataset.group
+    renderLibrary()
+  })
+}
+
 function renderCollectionFilters() {
   if (!collectionFilters) return
-
-  collectionFilters.innerHTML = ""
+  _ensureCollectionFilterDelegation()
 
   const collectionNames = ["None", ...collections.map(item => item.name).filter(name => name !== "None")]
 
-  collectionNames.forEach(name => {
-    const btn = document.createElement("button")
-    btn.type = "button"
-    btn.className = selectedCollectionFilter === name ? "tab active" : "tab"
-    btn.textContent = name
+  // Only rebuild DOM if the set of collections actually changed — avoids
+  // unnecessary innerHTML wipes and CSS transition repaints on Android.
+  const existing = Array.from(collectionFilters.querySelectorAll("button[data-collection]"))
+    .map(b => b.dataset.collection)
+  const same = existing.length === collectionNames.length &&
+    collectionNames.every((n, i) => existing[i] === n)
 
-    btn.addEventListener("click", () => {
-      selectedCollectionFilter = name
-      selectedGroupFilter = ""
-      renderGroupFilters()
-      renderLibrary()
+  if (!same) {
+    collectionFilters.innerHTML = ""
+    const frag = document.createDocumentFragment()
+    collectionNames.forEach(name => {
+      const btn = document.createElement("button")
+      btn.type = "button"
+      btn.dataset.collection = name
+      btn.textContent = name
+      frag.appendChild(btn)
     })
+    collectionFilters.appendChild(frag)
+  }
 
-    collectionFilters.appendChild(btn)
+  // Update active class without touching the DOM structure.
+  collectionFilters.querySelectorAll("button[data-collection]").forEach(btn => {
+    btn.className = btn.dataset.collection === selectedCollectionFilter ? "tab active" : "tab"
   })
 }
 
 function renderGroupFilters() {
   if (!groupFilters) return
+  _ensureGroupFilterDelegation()
 
   groupFilters.innerHTML = ""
 
-  if (!selectedCollectionFilter || selectedCollectionFilter === "None") {
-    return
-  }
+  if (!selectedCollectionFilter || selectedCollectionFilter === "None") return
 
   const availableGroups = groups.filter(item => item.collection === selectedCollectionFilter)
+  if (availableGroups.length === 0) return
 
+  const frag = document.createDocumentFragment()
   availableGroups.forEach(item => {
     const btn = document.createElement("button")
     btn.type = "button"
+    btn.dataset.group = item.name
     btn.className = selectedGroupFilter === item.name ? "tab active" : "tab"
     btn.textContent = item.name
-
-    btn.addEventListener("click", () => {
-      selectedGroupFilter = selectedGroupFilter === item.name ? "" : item.name
-      renderLibrary()
-    })
-
-    groupFilters.appendChild(btn)
+    frag.appendChild(btn)
   })
+  groupFilters.appendChild(frag)
 }
 
 let _libraryRenderPending = false

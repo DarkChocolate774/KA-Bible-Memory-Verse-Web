@@ -1260,102 +1260,25 @@ function renderGroupFilters() {
   })
 }
 
+let _libraryRenderPending = false
+let _filterBusy = false
+
 function renderLibrary() {
-  if (isRenderingLibrary) return
-  isRenderingLibrary = true
+  if (window._libraryRenderPending) return
 
-  refreshVerses()
+  window._libraryRenderPending = true
 
-  renderCollectionFilters()
-  renderGroupFilters()
+  requestAnimationFrame(() => {
+    window._libraryRenderPending = false
 
-  libraryGrid.innerHTML = ""
-
-  let filteredVerses = verses.slice()
-
-  if (selectedCollectionFilter && selectedCollectionFilter !== "All") {
-    filteredVerses = filteredVerses.filter(
-      verse => (verse.collection || "None") === selectedCollectionFilter
-    )
-  }
-
-  if (selectedGroupFilter) {
-    filteredVerses = filteredVerses.filter(verse => verse.group === selectedGroupFilter)
-  }
-
-  if (filteredVerses.length === 0) {
-    libraryGrid.textContent = "No verses found for this filter."
-    isRenderingLibrary = false
-    return
-  }
-
-  filteredVerses.forEach(verse => {
-    const card = document.createElement("div")
-    card.className = "customItem"
-
-    const meta = document.createElement("div")
-    meta.className = "meta"
-
-    const categoryLine = document.createElement("small")
-    categoryLine.textContent = verse.group
-      ? (verse.collection || "None") + " • " + verse.group
-      : (verse.collection || "None")
-
-    const title = document.createElement("div")
-    title.textContent = verse.title
-      ? verse.title + " • " + (verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref)
-      : (verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref)
-
-    const preview = document.createElement("small")
-    preview.textContent = verse.text.slice(0, 80) + (verse.text.length > 80 ? "..." : "")
-
-    meta.appendChild(categoryLine)
-    meta.appendChild(title)
-    meta.appendChild(preview)
-
-    const actions = document.createElement("div")
-    actions.className = "controls"
-
-    const playBtn = document.createElement("button")
-    playBtn.type = "button"
-    playBtn.className = "ghost"
-    playBtn.textContent = "Play"
-    playBtn.addEventListener("click", event => {
-      event.stopPropagation()
-      openGamePicker(verse.id)
-    })
-
-    const moveBtn = document.createElement("button")
-    moveBtn.type = "button"
-    moveBtn.className = "ghost"
-    moveBtn.textContent = "Move 📁"
-    moveBtn.addEventListener("click", event => {
-      event.stopPropagation()
-      openMoveVerseModal(verse)
-    })
-
-    const delBtn = document.createElement("button")
-    delBtn.type = "button"
-    delBtn.className = "danger"
-    delBtn.textContent = "Delete"
-    delBtn.addEventListener("click", event => {
-      event.stopPropagation()
-      confirmDelete(verse.id, card)
-    })
-
-    actions.appendChild(playBtn)
-    actions.appendChild(moveBtn)
-    actions.appendChild(delBtn)
-
-    card.appendChild(meta)
-    card.appendChild(actions)
-
-    card.addEventListener("click", () => openGamePicker(verse.id))
-    libraryGrid.appendChild(card)
+    try {
+      _renderLibraryNow()
+    } catch (e) {
+      console.error("renderLibrary error:", e)
+    }
   })
-
-  isRenderingLibrary = false
 }
+
 
 function confirmDelete(id, row) {
   row.innerHTML = ""
@@ -2409,33 +2332,42 @@ btnAddGroupInline.addEventListener("click", () => {
 collectionFilters.addEventListener("click", event => {
   const btn = event.target.closest("button[data-collection]")
   if (!btn) return
-  if (isRenderingLibrary) return
+  if (window._filterBusy) return
 
   const name = btn.dataset.collection
   if (!name) return
+  if (selectedCollectionFilter === name) return
+
+  window._filterBusy = true
 
   selectedCollectionFilter = name
   selectedGroupFilter = ""
 
-  requestAnimationFrame(() => {
-    renderGroupFilters()
-    renderLibrary()
-  })
+  renderGroupFilters()
+  renderLibrary()
+
+  setTimeout(() => {
+    window._filterBusy = false
+  }, 200)
 })
 
 groupFilters.addEventListener("click", event => {
   const btn = event.target.closest("button[data-group]")
   if (!btn) return
-  if (isRenderingLibrary) return
+  if (window._filterBusy) return
 
   const name = btn.dataset.group
   if (!name) return
 
+  window._filterBusy = true
+
   selectedGroupFilter = selectedGroupFilter === name ? "" : name
 
-  requestAnimationFrame(() => {
-    renderLibrary()
-  })
+  renderLibrary()
+
+  setTimeout(() => {
+    window._filterBusy = false
+  }, 200)
 })
 
 btnRenameCollectionInline.addEventListener("click", openRenameCollectionModal)

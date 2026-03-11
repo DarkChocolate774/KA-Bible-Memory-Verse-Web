@@ -417,6 +417,35 @@
 
     </main>
 
+    <!-- Error overlay — catches JS crashes that silently white-out the page
+         on Android Chrome (ES module errors are not shown by default).
+         Shows the error message on screen so we can diagnose it.
+         REMOVE THIS BLOCK once the bug is identified and fixed. -->
+    <div id="errOverlay" style="
+        display:none;position:fixed;inset:0;z-index:9999;
+        background:rgba(0,0,0,0.92);color:#fff;padding:24px;
+        font-family:monospace;font-size:14px;overflow:auto;
+        white-space:pre-wrap;word-break:break-word;">
+      <strong style="font-size:16px;">⚠️ App Error (debug mode)</strong>
+      <div id="errMsg" style="margin-top:12px;"></div>
+      <button onclick="document.getElementById('errOverlay').style.display='none'"
+        style="margin-top:16px;padding:10px 18px;background:#fff;color:#000;
+               border:none;border-radius:8px;font-size:14px;cursor:pointer;">
+        Dismiss
+      </button>
+    </div>
+    <script>
+      function _showErr(msg) {
+        document.getElementById("errMsg").textContent = msg;
+        document.getElementById("errOverlay").style.display = "block";
+      }
+      window.addEventListener("error", function(e) {
+        _showErr((e.message || "Unknown error") + "\n\nFile: " + (e.filename || "") + "\nLine: " + e.lineno + "\nCol: " + e.colno + (e.error && e.error.stack ? "\n\n" + e.error.stack : ""));
+      });
+      window.addEventListener("unhandledrejection", function(e) {
+        _showErr("Unhandled Promise Rejection:\n" + (e.reason && e.reason.stack ? e.reason.stack : String(e.reason)));
+      });
+    </script>
     <script type="module" src="app.js"></script>
 
 </body>

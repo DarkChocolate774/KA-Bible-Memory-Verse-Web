@@ -206,11 +206,9 @@ const importCsvMsg = document.getElementById("importCsvMsg")
 let currentUser = null
 
 async function loginWithGoogle() {
-  console.log("login button clicked")
 
   try {
     await signInWithPopup(auth, provider)
-    console.log("popup opened or login succeeded")
   } catch (error) {
     console.error("Google login error:", error)
     authMsg.textContent = "Login failed."
@@ -278,8 +276,6 @@ async function loadVersesFromCloud() {
   // Prevent overlapping fetches — a second call while one is in flight
   // causes two renderLibrary() calls back-to-back, which on Android Chrome
   // causes layout thrashing and freezes.
-  window.dbg && window.dbg("loadVersesFromCloud() called")
-  if (_isLoadingVerses) { window.dbg && window.dbg("WARN: loadVersesFromCloud skipped — already loading"); return }
   _isLoadingVerses = true
 
   // Show a subtle loading hint so the user doesn't tap again thinking
@@ -1259,11 +1255,21 @@ function startSelectedGame(mode) {
 // ---------------------------------------------------------------------------
 let _filterBusy = false
 
+// Cache keys — filter bars are only rebuilt when their data actually changes.
+// Rebuilding buttons on every renderLibrary() call was causing unnecessary
+// DOM churn and layout reflows on Android Chrome.
+let _collectionFiltersCacheKey = null
+let _groupFiltersCacheKey = null
+
 function renderCollectionFilters() {
-  window.dbg && window.dbg("renderCollectionFilters() called")
   if (!collectionFilters) return
 
   const collectionNames = ["None", ...collections.map(item => item.name).filter(name => name !== "None")]
+  const cacheKey = collectionNames.join("|") + "||" + selectedCollectionFilter
+
+  // Skip full rebuild if buttons + active state haven't changed
+  if (cacheKey === _collectionFiltersCacheKey) return
+  _collectionFiltersCacheKey = cacheKey
 
   collectionFilters.innerHTML = ""
   const frag = document.createDocumentFragment()
@@ -1275,11 +1281,12 @@ function renderCollectionFilters() {
     btn.addEventListener("click", () => {
       if (_filterBusy) return
       _filterBusy = true
-      window.dbg && window.dbg("Collection tab tapped: " + name)
       selectedCollectionFilter = name
       selectedGroupFilter = ""
+      // Invalidate cache so next renderLibrary() rebuilds with new active state
+      _collectionFiltersCacheKey = null
+      _groupFiltersCacheKey = null
       renderLibrary()
-      // Release the guard after the current call stack unwinds
       setTimeout(() => { _filterBusy = false }, 0)
     })
     frag.appendChild(btn)
@@ -1288,14 +1295,19 @@ function renderCollectionFilters() {
 }
 
 function renderGroupFilters() {
-  window.dbg && window.dbg("renderGroupFilters() called — selected: " + selectedCollectionFilter)
   if (!groupFilters) return
 
+  const availableGroups = (!selectedCollectionFilter || selectedCollectionFilter === "None")
+    ? []
+    : groups.filter(item => item.collection === selectedCollectionFilter)
+
+  const cacheKey = availableGroups.map(g => g.name).join("|") + "||" + selectedGroupFilter
+
+  // Skip full rebuild if buttons + active state haven't changed
+  if (cacheKey === _groupFiltersCacheKey) return
+  _groupFiltersCacheKey = cacheKey
+
   groupFilters.innerHTML = ""
-
-  if (!selectedCollectionFilter || selectedCollectionFilter === "None") return
-
-  const availableGroups = groups.filter(item => item.collection === selectedCollectionFilter)
   if (availableGroups.length === 0) return
 
   const frag = document.createDocumentFragment()
@@ -1307,8 +1319,8 @@ function renderGroupFilters() {
     btn.addEventListener("click", () => {
       if (_filterBusy) return
       _filterBusy = true
-      window.dbg && window.dbg("Group tab tapped: " + item.name)
       selectedGroupFilter = selectedGroupFilter === item.name ? "" : item.name
+      _groupFiltersCacheKey = null
       renderLibrary()
       setTimeout(() => { _filterBusy = false }, 0)
     })
@@ -1320,8 +1332,6 @@ function renderGroupFilters() {
 let _libraryRenderPending = false
 
 function renderLibrary() {
-  window.dbg && window.dbg("renderLibrary() called")
-  if (_libraryRenderPending) { window.dbg && window.dbg("WARN: renderLibrary() skipped — already pending"); return }
   _libraryRenderPending = true
   requestAnimationFrame(() => {
     _libraryRenderPending = false
@@ -1381,7 +1391,6 @@ function _ensureLibraryDelegation() {
 }
 
 function _renderLibraryNow() {
-  window.dbg && window.dbg("_renderLibraryNow() start — verses: " + verses.length + ", collection: " + selectedCollectionFilter)
   refreshVerses()
   _ensureLibraryDelegation()
 

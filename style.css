@@ -209,6 +209,7 @@ button {
    these specifically. */
 .tab {
   transition: none !important;
+  touch-action: manipulation;
 }
 
 button:hover {

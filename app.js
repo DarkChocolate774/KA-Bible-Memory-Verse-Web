@@ -1320,23 +1320,39 @@ function renderGroupFilters() {
   if (!groupFilters) return
   _ensureGroupFilterDelegation()
 
-  groupFilters.innerHTML = ""
+  const availableGroups = (!selectedCollectionFilter || selectedCollectionFilter === "None")
+    ? []
+    : groups.filter(item => item.collection === selectedCollectionFilter)
 
-  if (!selectedCollectionFilter || selectedCollectionFilter === "None") return
+  // Smart diff — only touch the DOM if the group list actually changed.
+  // Wiping innerHTML on every render was causing Android Chrome to dispatch
+  // synthetic mutation events that re-triggered the delegated click listener,
+  // creating an infinite renderLibrary loop and instant freeze on tap.
+  const existing = Array.from(groupFilters.querySelectorAll("button[data-group]"))
+    .map(b => b.dataset.group)
+  const incoming = availableGroups.map(g => g.name)
+  const same = existing.length === incoming.length &&
+    incoming.every((n, i) => existing[i] === n)
 
-  const availableGroups = groups.filter(item => item.collection === selectedCollectionFilter)
-  if (availableGroups.length === 0) return
+  if (!same) {
+    groupFilters.innerHTML = ""
+    if (incoming.length > 0) {
+      const frag = document.createDocumentFragment()
+      availableGroups.forEach(item => {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.dataset.group = item.name
+        btn.textContent = item.name
+        frag.appendChild(btn)
+      })
+      groupFilters.appendChild(frag)
+    }
+  }
 
-  const frag = document.createDocumentFragment()
-  availableGroups.forEach(item => {
-    const btn = document.createElement("button")
-    btn.type = "button"
-    btn.dataset.group = item.name
-    btn.className = selectedGroupFilter === item.name ? "tab active" : "tab"
-    btn.textContent = item.name
-    frag.appendChild(btn)
+  // Update active class only — no DOM structure changes.
+  groupFilters.querySelectorAll("button[data-group]").forEach(btn => {
+    btn.className = btn.dataset.group === selectedGroupFilter ? "tab active" : "tab"
   })
-  groupFilters.appendChild(frag)
 }
 
 let _libraryRenderPending = false

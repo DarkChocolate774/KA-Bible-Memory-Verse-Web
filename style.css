@@ -93,6 +93,11 @@ body[data-theme="white"] {
 
 * {
   box-sizing: border-box;
+  /* Eliminates the 300ms tap delay on Android Chrome for all elements.
+     Without this, Chrome waits to check for double-tap zoom, and synthetic
+     mouse events fire on freshly re-rendered buttons during that window,
+     causing unintended re-triggers and freezes. */
+  touch-action: manipulation;
 }
 
 body {
@@ -196,6 +201,14 @@ button {
   border-radius: 12px;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease, transform 0.1s ease;
+}
+
+/* Filter tab buttons (collection/group) are recreated on every render.
+   CSS transitions on freshly inserted elements force an immediate layout
+   reflow on Android Chrome, causing the freeze. Disable transitions for
+   these specifically. */
+.tab {
+  transition: none !important;
 }
 
 button:hover {

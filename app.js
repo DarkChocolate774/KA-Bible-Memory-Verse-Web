@@ -1292,9 +1292,8 @@ function renderCollectionFilters() {
     btn.type = "button"
     btn.className = name === selectedCollectionFilter ? "tab active" : "tab"
     btn.textContent = name
-    btn.addEventListener("click", () => {
-      // Block Android ghost taps fired on newly inserted buttons
-      if (Date.now() - _lastFilterRebuildTime < 600) return
+    btn.addEventListener("touchstart", (e) => {
+      e.preventDefault()
       if (_filterBusy) return
       _filterBusy = true
       selectedCollectionFilter = name
@@ -1302,7 +1301,17 @@ function renderCollectionFilters() {
       _collectionFiltersCacheKey = null
       _groupFiltersCacheKey = null
       renderLibrary()
-      setTimeout(() => { _filterBusy = false }, 0)
+      setTimeout(() => { _filterBusy = false }, 300)
+    }, { passive: false })
+    btn.addEventListener("click", () => {
+      if (_filterBusy) return
+      _filterBusy = true
+      selectedCollectionFilter = name
+      selectedGroupFilter = ""
+      _collectionFiltersCacheKey = null
+      _groupFiltersCacheKey = null
+      renderLibrary()
+      setTimeout(() => { _filterBusy = false }, 300)
     })
     frag.appendChild(btn)
   })
@@ -1332,15 +1341,22 @@ function renderGroupFilters() {
     btn.type = "button"
     btn.className = item.name === selectedGroupFilter ? "tab active" : "tab"
     btn.textContent = item.name
-    btn.addEventListener("click", () => {
-      // Block ghost taps fired by Android Chrome on newly inserted buttons
-      if (Date.now() - _lastFilterRebuildTime < 600) return
+    btn.addEventListener("touchstart", (e) => {
+      e.preventDefault()
       if (_filterBusy) return
       _filterBusy = true
       selectedGroupFilter = selectedGroupFilter === item.name ? "" : item.name
       _groupFiltersCacheKey = null
       renderLibrary()
-      setTimeout(() => { _filterBusy = false }, 0)
+      setTimeout(() => { _filterBusy = false }, 300)
+    }, { passive: false })
+    btn.addEventListener("click", () => {
+      if (_filterBusy) return
+      _filterBusy = true
+      selectedGroupFilter = selectedGroupFilter === item.name ? "" : item.name
+      _groupFiltersCacheKey = null
+      renderLibrary()
+      setTimeout(() => { _filterBusy = false }, 300)
     })
     frag.appendChild(btn)
   })
@@ -2638,30 +2654,4 @@ tabSettings.addEventListener("click", () => showPage("settings"))
 modeType.addEventListener("click", () => startSelectedGame("type"))
 modeDrag.addEventListener("click", () => startSelectedGame("drag"))
 modeLetters.addEventListener("click", () => startSelectedGame("letters"))
-
-btnSaveMoveVerse.addEventListener("click", saveMoveVerse)
-btnCancelMoveVerse.addEventListener("click", hideAllModals)
-
-pasteBox.addEventListener("paste", () => {
-  setTimeout(autoFillFromPastedText, 0)
-})
-
-themeSelect.addEventListener("change", event => {
-  saveTheme(event.target.value)
-})
-
-btnImportCsvPage.addEventListener("click", () => showPage("importCsv"))
-
-btnCancelImportCsv.addEventListener("click", () => showPage("library"))
-
-btnImportCsv.addEventListener("click", importCsvFile)
-
-importCollectionSelect.addEventListener("change", () => {
-  renderImportGroupOptions(importCollectionSelect.value || "None", "")
-})
-
-initTheme()
-showPage("library")
-refreshVerses()
-loadStats()
 

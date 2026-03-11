@@ -63,6 +63,8 @@ let selectedCollectionFilter = "None"
 let selectedGroupFilter = ""
 let moveVerseId = ""
 
+let _isLoadingVerses = false
+
 const btnLogin = document.getElementById("btnLogin")
 const btnLogout = document.getElementById("btnLogout")
 const authMsg = document.getElementById("authMsg")
@@ -273,6 +275,18 @@ async function loadVersesFromCloud() {
     return
   }
 
+  // Prevent overlapping fetches — a second call while one is in flight
+  // causes two renderLibrary() calls back-to-back, which on Android Chrome
+  // causes layout thrashing and freezes.
+  if (_isLoadingVerses) return
+  _isLoadingVerses = true
+
+  // Show a subtle loading hint so the user doesn't tap again thinking
+  // nothing happened (a major cause of cascading crashes on mobile).
+  if (libraryGrid) {
+    libraryGrid.innerHTML = "<div style='padding:12px;color:var(--muted);'>Loading…</div>"
+  }
+
   try {
     const versesRef = collection(db, "users", currentUser.uid, "verses")
     const snapshot = await getDocs(versesRef)
@@ -296,7 +310,12 @@ async function loadVersesFromCloud() {
     renderLibrary()
 
     if (verses.length > 0) {
-      loadVerse(verses[0].id)
+      // Only auto-load a verse if none is currently selected, to avoid
+      // resetting the user's selection on every background reload.
+      const idToLoad = (selectedVerseId && verses.some(v => v.id === selectedVerseId))
+        ? selectedVerseId
+        : verses[0].id
+      loadVerse(idToLoad)
       setPracticeEnabled(true)
     } else {
       setPracticeEnabled(false)
@@ -307,6 +326,9 @@ async function loadVersesFromCloud() {
   } catch (error) {
     console.error("Load verses failed:", error)
     manageMsg.textContent = "Failed to load cloud verses."
+    if (libraryGrid) libraryGrid.innerHTML = ""
+  } finally {
+    _isLoadingVerses = false
   }
 }
 
@@ -1156,7 +1178,9 @@ function showPage(name) {
   if (name === "library") {
     pageLibrary.classList.remove("isHidden")
     tabLibrary.classList.add("active")
-    renderLibrary()
+    // Skip redundant re-render if a cloud fetch is already rebuilding the
+    // library — avoids a second simultaneous DOM rebuild on Android Chrome.
+    if (!_isLoadingVerses) renderLibrary()
     return
   }
 
@@ -1271,7 +1295,21 @@ function renderGroupFilters() {
   })
 }
 
+let _libraryRenderPending = false
+
 function renderLibrary() {
+  // Debounce rapid calls into a single animation frame to prevent
+  // layout thrashing on Android Chrome (caused by back-to-back deletes,
+  // filter taps, and post-import reloads all hammering the DOM).
+  if (_libraryRenderPending) return
+  _libraryRenderPending = true
+  requestAnimationFrame(() => {
+    _libraryRenderPending = false
+    _renderLibraryNow()
+  })
+}
+
+function _renderLibraryNow() {
   refreshVerses()
 
   renderCollectionFilters()
@@ -1357,7 +1395,15 @@ function renderLibrary() {
     card.appendChild(meta)
     card.appendChild(actions)
 
-    card.addEventListener("click", () => openGamePicker(verse.id))
+    // Android Chrome fires a synthetic click ~300ms after touchend.
+    // If the grid was rebuilt during that window (e.g. mid-delete), the new
+    // card sitting under the finger receives a ghost click. Record the
+    // card's creation time and ignore clicks that arrive within 400ms of it.
+    const cardCreatedAt = Date.now()
+    card.addEventListener("click", () => {
+      if (Date.now() - cardCreatedAt < 400) return
+      openGamePicker(verse.id)
+    })
     libraryGrid.appendChild(card)
   })
 }
@@ -1383,6 +1429,13 @@ function confirmDelete(id, row) {
   yes.textContent = "Delete"
   yes.addEventListener("click", (event) => {
     event.stopPropagation()
+    // Disable immediately to block Android ghost-tap double-fires
+    yes.disabled = true
+    no.disabled = true
+    yes.textContent = "Deleting…"
+    // Remove card from DOM now so the user can tap other cards freely
+    // without waiting for the async delete + full re-render to finish
+    row.remove()
     deleteCustomVerse(id)
   })
 
@@ -1392,7 +1445,7 @@ function confirmDelete(id, row) {
   no.textContent = "Cancel"
   no.addEventListener("click", (event) => {
     event.stopPropagation()
-    showPage("library")
+    renderLibrary()
   })
 
   const actions = document.createElement("div")
@@ -1494,20 +1547,25 @@ async function deleteCustomVerse(id) {
   try {
     await deleteDoc(doc(db, "users", currentUser.uid, "verses", id))
 
-    await loadVersesFromCloud()
+    // Update local array directly — avoids a full Firestore reload + DOM
+    // rebuild after every delete, which was the main cause of Android freezes
+    // when deleting multiple verses in a row.
+    verses = verses.filter(v => v.id !== id)
 
     if (verses.length === 0) {
       setPracticeEnabled(false)
       practiceVerseTitle.textContent = "No verses yet"
       verseText.textContent = "Go to Library to add one."
       setTypingEnabled(false)
+      renderLibrary()
     }
 
     manageMsg.textContent = "Deleted."
-    showPage("library")
   } catch (error) {
     console.error("Delete verse failed:", error)
     manageMsg.textContent = "Failed to delete verse."
+    // On error restore accurate state from cloud
+    await loadVersesFromCloud()
   }
 }
 
@@ -2340,6 +2398,12 @@ async function importCsvFile() {
     return
   }
 
+  // Guard against double-taps and overlapping imports (common on Android)
+  if (btnImportCsv.disabled) return
+  btnImportCsv.disabled = true
+  btnCancelImportCsv.disabled = true
+  importCsvMsg.textContent = "Importing…"
+
   const collectionValue = importCollectionSelect.value || "None"
   const groupValue = collectionValue === "None" ? "" : (importGroupSelect.value || "")
 
@@ -2352,45 +2416,56 @@ async function importCsvFile() {
       return
     }
 
-    const batch = writeBatch(db)
-    let addedCount = 0
+    const validRows = rows.filter(row => (row.ref || "").trim() && (row.text || "").trim())
 
-    rows.forEach(row => {
-      const ref = (row.ref || "").trim()
-      const version = (row.version || "").trim()
-      const text = (row.text || "").trim()
-      const title = (row.title || "").trim()
-
-      if (!ref || !text) return
-
-      const verseRef = doc(collection(db, "users", currentUser.uid, "verses"))
-
-      batch.set(verseRef, {
-        ref,
-        version,
-        text,
-        title,
-        collection: collectionValue,
-        group: groupValue,
-        createdAt: serverTimestamp()
-      })
-
-      addedCount += 1
-    })
-
-    if (addedCount === 0) {
+    if (validRows.length === 0) {
       importCsvMsg.textContent = "No rows with ref and text were found."
       return
     }
 
-    await batch.commit()
+    // Firestore batches are capped at 500 writes — chunk to avoid silent failures
+    // on larger CSV files
+    const CHUNK_SIZE = 490
+    for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
+      const chunk = validRows.slice(i, i + CHUNK_SIZE)
+      const batch = writeBatch(db)
+
+      chunk.forEach(row => {
+        const verseRef = doc(collection(db, "users", currentUser.uid, "verses"))
+        batch.set(verseRef, {
+          ref: (row.ref || "").trim(),
+          version: (row.version || "").trim(),
+          text: (row.text || "").trim(),
+          title: (row.title || "").trim(),
+          collection: collectionValue,
+          group: groupValue,
+          createdAt: serverTimestamp()
+        })
+      })
+
+      await batch.commit()
+    }
+
     await loadVersesFromCloud()
 
-    importCsvMsg.textContent = addedCount + " verse(s) imported."
-    csvFileInput.value = ""
+    importCsvMsg.textContent = validRows.length + " verse(s) imported."
+
+    // On Android Chrome, csvFileInput.value = "" doesn't always clear the
+    // file picker — replacing the element is the reliable cross-browser fix.
+    try {
+      const newInput = csvFileInput.cloneNode(true)
+      csvFileInput.parentNode.replaceChild(newInput, csvFileInput)
+      // Re-point the module-level reference
+      Object.defineProperty(window, '_csvFileInputEl', { value: newInput, configurable: true })
+    } catch (_) {
+      csvFileInput.value = ""
+    }
   } catch (error) {
     console.error("CSV import failed:", error)
     importCsvMsg.textContent = "Failed to import CSV."
+  } finally {
+    btnImportCsv.disabled = false
+    btnCancelImportCsv.disabled = false
   }
 }
 

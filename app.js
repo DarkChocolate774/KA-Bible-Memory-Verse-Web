@@ -1391,11 +1391,15 @@ function _ensureLibraryDelegation() {
 }
 
 function _renderLibraryNow() {
+  const _t0 = performance.now()
   refreshVerses()
   _ensureLibraryDelegation()
 
+  const _t1 = performance.now()
   renderCollectionFilters()
+  const _t2 = performance.now()
   renderGroupFilters()
+  const _t3 = performance.now()
 
   libraryGrid.innerHTML = ""
 
@@ -1476,7 +1480,10 @@ function _renderLibraryNow() {
     fragment.appendChild(card)
   })
 
+  const _t4 = performance.now()
   libraryGrid.appendChild(fragment)
+  const _t5 = performance.now()
+  console.log(`[PERF] renderLibraryNow total=${(_t5-_t0).toFixed(1)}ms | collFilters=${(_t2-_t1).toFixed(1)}ms | grpFilters=${(_t3-_t2).toFixed(1)}ms | gridBuild=${(_t4-_t3).toFixed(1)}ms | domInsert=${(_t5-_t4).toFixed(1)}ms`)
 
   // Signal the delegated listener that the grid was just rebuilt so it can
   // ignore the next ghost tap from Android Chrome's 300 ms click delay.

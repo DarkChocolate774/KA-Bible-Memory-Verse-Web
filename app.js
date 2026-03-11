@@ -59,9 +59,10 @@ let tapDifficulty = "easy"
 
 let collections = []
 let groups = []
-let selectedCollectionFilter = "None"
+let selectedCollectionFilter = "All"
 let selectedGroupFilter = ""
 let moveVerseId = ""
+let isRenderingLibrary = false
 
 const btnLogin = document.getElementById("btnLogin")
 const btnLogout = document.getElementById("btnLogout")
@@ -1226,21 +1227,14 @@ function renderCollectionFilters() {
 
   collectionFilters.innerHTML = ""
 
-  const collectionNames = ["None", ...collections.map(item => item.name).filter(name => name !== "None")]
+  const collectionNames = ["All", "None", ...collections.map(item => item.name).filter(name => name !== "None")]
 
   collectionNames.forEach(name => {
     const btn = document.createElement("button")
     btn.type = "button"
     btn.className = selectedCollectionFilter === name ? "tab active" : "tab"
     btn.textContent = name
-
-    btn.addEventListener("click", () => {
-      selectedCollectionFilter = name
-      selectedGroupFilter = ""
-      renderGroupFilters()
-      renderLibrary()
-    })
-
+    btn.dataset.collection = name
     collectionFilters.appendChild(btn)
   })
 }
@@ -1250,7 +1244,7 @@ function renderGroupFilters() {
 
   groupFilters.innerHTML = ""
 
-  if (!selectedCollectionFilter || selectedCollectionFilter === "None") {
+  if (!selectedCollectionFilter || selectedCollectionFilter === "All" || selectedCollectionFilter === "None") {
     return
   }
 
@@ -1261,17 +1255,15 @@ function renderGroupFilters() {
     btn.type = "button"
     btn.className = selectedGroupFilter === item.name ? "tab active" : "tab"
     btn.textContent = item.name
-
-    btn.addEventListener("click", () => {
-      selectedGroupFilter = selectedGroupFilter === item.name ? "" : item.name
-      renderLibrary()
-    })
-
+    btn.dataset.group = item.name
     groupFilters.appendChild(btn)
   })
 }
 
 function renderLibrary() {
+  if (isRenderingLibrary) return
+  isRenderingLibrary = true
+
   refreshVerses()
 
   renderCollectionFilters()
@@ -1281,7 +1273,7 @@ function renderLibrary() {
 
   let filteredVerses = verses.slice()
 
-  if (selectedCollectionFilter) {
+  if (selectedCollectionFilter && selectedCollectionFilter !== "All") {
     filteredVerses = filteredVerses.filter(
       verse => (verse.collection || "None") === selectedCollectionFilter
     )
@@ -1293,6 +1285,7 @@ function renderLibrary() {
 
   if (filteredVerses.length === 0) {
     libraryGrid.textContent = "No verses found for this filter."
+    isRenderingLibrary = false
     return
   }
 
@@ -1360,6 +1353,8 @@ function renderLibrary() {
     card.addEventListener("click", () => openGamePicker(verse.id))
     libraryGrid.appendChild(card)
   })
+
+  isRenderingLibrary = false
 }
 
 function confirmDelete(id, row) {
@@ -2409,6 +2404,38 @@ btnAddGroupInline.addEventListener("click", () => {
   collectionSelect.value = selectedCollectionFilter
   renderGroupOptions()
   showPage("addGroup")
+})
+
+collectionFilters.addEventListener("click", event => {
+  const btn = event.target.closest("button[data-collection]")
+  if (!btn) return
+  if (isRenderingLibrary) return
+
+  const name = btn.dataset.collection
+  if (!name) return
+
+  selectedCollectionFilter = name
+  selectedGroupFilter = ""
+
+  requestAnimationFrame(() => {
+    renderGroupFilters()
+    renderLibrary()
+  })
+})
+
+groupFilters.addEventListener("click", event => {
+  const btn = event.target.closest("button[data-group]")
+  if (!btn) return
+  if (isRenderingLibrary) return
+
+  const name = btn.dataset.group
+  if (!name) return
+
+  selectedGroupFilter = selectedGroupFilter === name ? "" : name
+
+  requestAnimationFrame(() => {
+    renderLibrary()
+  })
 })
 
 btnRenameCollectionInline.addEventListener("click", openRenameCollectionModal)

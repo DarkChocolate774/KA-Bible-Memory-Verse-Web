@@ -1250,113 +1250,71 @@ function startSelectedGame(mode) {
 }
 
 // ---------------------------------------------------------------------------
-// Collection & group filter bars — event delegation.
-// Previously every renderCollectionFilters / renderGroupFilters call wiped
-// innerHTML and re-attached a click listener per button. Because these are
-// called from inside _renderLibraryNow, tapping a collection tab caused:
-//   tap → renderGroupFilters() + renderLibrary()
-//          └─ _renderLibraryNow → renderCollectionFilters() + renderGroupFilters() again
-// = double listener registration + double CSS transition repaint on Android.
-// Now listeners are attached once; rebuilds only swap text/class, no new listeners.
+// Filter bars — rendered fresh each time but with a re-entrance guard.
+// We do NOT use event delegation here because Android Chrome fires synthetic
+// click events on containers when their innerHTML is mutated during a touch
+// sequence, causing an infinite renderLibrary loop and instant freeze.
+// Instead each button gets a direct listener, and a shared _filterBusy flag
+// blocks any re-entrance while a filter action is already being processed.
 // ---------------------------------------------------------------------------
-let _collectionDelegationReady = false
-let _groupDelegationReady = false
-
-function _ensureCollectionFilterDelegation() {
-  if (_collectionDelegationReady) return
-  _collectionDelegationReady = true
-  collectionFilters.addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-collection]")
-    if (!btn) return
-    window.dbg && window.dbg("Collection tab tapped: " + btn.dataset.collection)
-    selectedCollectionFilter = btn.dataset.collection
-    selectedGroupFilter = ""
-    renderLibrary()
-  })
-}
-
-function _ensureGroupFilterDelegation() {
-  if (_groupDelegationReady) return
-  _groupDelegationReady = true
-  groupFilters.addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-group]")
-    if (!btn) return
-    selectedGroupFilter = selectedGroupFilter === btn.dataset.group ? "" : btn.dataset.group
-    renderLibrary()
-  })
-}
+let _filterBusy = false
 
 function renderCollectionFilters() {
   window.dbg && window.dbg("renderCollectionFilters() called")
   if (!collectionFilters) return
-  _ensureCollectionFilterDelegation()
 
   const collectionNames = ["None", ...collections.map(item => item.name).filter(name => name !== "None")]
 
-  // Only rebuild DOM if the set of collections actually changed — avoids
-  // unnecessary innerHTML wipes and CSS transition repaints on Android.
-  const existing = Array.from(collectionFilters.querySelectorAll("button[data-collection]"))
-    .map(b => b.dataset.collection)
-  const same = existing.length === collectionNames.length &&
-    collectionNames.every((n, i) => existing[i] === n)
-
-  if (!same) {
-    collectionFilters.innerHTML = ""
-    const frag = document.createDocumentFragment()
-    collectionNames.forEach(name => {
-      const btn = document.createElement("button")
-      btn.type = "button"
-      btn.dataset.collection = name
-      btn.textContent = name
-      frag.appendChild(btn)
+  collectionFilters.innerHTML = ""
+  const frag = document.createDocumentFragment()
+  collectionNames.forEach(name => {
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = name === selectedCollectionFilter ? "tab active" : "tab"
+    btn.textContent = name
+    btn.addEventListener("click", () => {
+      if (_filterBusy) return
+      _filterBusy = true
+      window.dbg && window.dbg("Collection tab tapped: " + name)
+      selectedCollectionFilter = name
+      selectedGroupFilter = ""
+      renderLibrary()
+      // Release the guard after the current call stack unwinds
+      setTimeout(() => { _filterBusy = false }, 0)
     })
-    collectionFilters.appendChild(frag)
-  }
-
-  // Update active class without touching the DOM structure.
-  collectionFilters.querySelectorAll("button[data-collection]").forEach(btn => {
-    btn.className = btn.dataset.collection === selectedCollectionFilter ? "tab active" : "tab"
+    frag.appendChild(btn)
   })
+  collectionFilters.appendChild(frag)
 }
 
 function renderGroupFilters() {
   window.dbg && window.dbg("renderGroupFilters() called — selected: " + selectedCollectionFilter)
   if (!groupFilters) return
-  _ensureGroupFilterDelegation()
 
-  const availableGroups = (!selectedCollectionFilter || selectedCollectionFilter === "None")
-    ? []
-    : groups.filter(item => item.collection === selectedCollectionFilter)
+  groupFilters.innerHTML = ""
 
-  // Smart diff — only touch the DOM if the group list actually changed.
-  // Wiping innerHTML on every render was causing Android Chrome to dispatch
-  // synthetic mutation events that re-triggered the delegated click listener,
-  // creating an infinite renderLibrary loop and instant freeze on tap.
-  const existing = Array.from(groupFilters.querySelectorAll("button[data-group]"))
-    .map(b => b.dataset.group)
-  const incoming = availableGroups.map(g => g.name)
-  const same = existing.length === incoming.length &&
-    incoming.every((n, i) => existing[i] === n)
+  if (!selectedCollectionFilter || selectedCollectionFilter === "None") return
 
-  if (!same) {
-    groupFilters.innerHTML = ""
-    if (incoming.length > 0) {
-      const frag = document.createDocumentFragment()
-      availableGroups.forEach(item => {
-        const btn = document.createElement("button")
-        btn.type = "button"
-        btn.dataset.group = item.name
-        btn.textContent = item.name
-        frag.appendChild(btn)
-      })
-      groupFilters.appendChild(frag)
-    }
-  }
+  const availableGroups = groups.filter(item => item.collection === selectedCollectionFilter)
+  if (availableGroups.length === 0) return
 
-  // Update active class only — no DOM structure changes.
-  groupFilters.querySelectorAll("button[data-group]").forEach(btn => {
-    btn.className = btn.dataset.group === selectedGroupFilter ? "tab active" : "tab"
+  const frag = document.createDocumentFragment()
+  availableGroups.forEach(item => {
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = item.name === selectedGroupFilter ? "tab active" : "tab"
+    btn.textContent = item.name
+    btn.addEventListener("click", () => {
+      if (_filterBusy) return
+      _filterBusy = true
+      window.dbg && window.dbg("Group tab tapped: " + item.name)
+      selectedGroupFilter = selectedGroupFilter === item.name ? "" : item.name
+      renderLibrary()
+      setTimeout(() => { _filterBusy = false }, 0)
+    })
+    frag.appendChild(btn)
   })
+  groupFilters.appendChild(frag)
 }
 
 let _libraryRenderPending = false

@@ -1263,9 +1263,9 @@ function attachTopLevelEvents() {
   btnBackFromMoveVerse.addEventListener("click", () => showPage("library"))
 }
 
-const loginBtn = document.getElementById("loginBtn")
-const logoutBtn = document.getElementById("logoutBtn")
-const authStatus = document.getElementById("authStatus")
+const loginBtn = document.getElementById("btnLogin")
+const logoutBtn = document.getElementById("btnLogout")
+const authStatus = document.getElementById("authMsg")
 
 loginBtn?.addEventListener("click", async () => {
   try {

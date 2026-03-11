@@ -1279,6 +1279,89 @@ function renderLibrary() {
   })
 }
 
+function _renderLibraryNow() {
+  if (!libraryGrid) return
+
+  renderCollectionFilters()
+  renderGroupFilters()
+
+  libraryGrid.innerHTML = ""
+
+  let filteredVerses = verses.filter(verse => {
+    const verseCollection = verse.collection || "None"
+    const verseGroup = verse.group || ""
+
+    const collectionMatch =
+      selectedCollectionFilter === "All" ||
+      selectedCollectionFilter === verseCollection
+
+    const groupMatch =
+      !selectedGroupFilter ||
+      selectedGroupFilter === verseGroup
+
+    return collectionMatch && groupMatch
+  })
+
+  if (filteredVerses.length === 0) {
+    libraryGrid.innerHTML = `<div class="result">No verses found.</div>`
+    return
+  }
+
+  filteredVerses.forEach(verse => {
+    const row = document.createElement("div")
+    row.className = "customItem"
+
+    const meta = document.createElement("div")
+    meta.className = "meta"
+
+    const title = document.createElement("div")
+    title.textContent = verse.title || verse.ref || "Untitled"
+
+    const small = document.createElement("small")
+    small.textContent =
+      (verse.ref || "") +
+      (verse.version ? " (" + verse.version + ")" : "") +
+      (verse.group ? " • " + verse.group : "")
+
+    meta.appendChild(title)
+    meta.appendChild(small)
+
+    const actions = document.createElement("div")
+    actions.className = "controls"
+
+    const playBtn = document.createElement("button")
+    playBtn.type = "button"
+    playBtn.textContent = "Play"
+    playBtn.addEventListener("click", () => {
+      openGamePicker(verse.id)
+    })
+
+    const moveBtn = document.createElement("button")
+    moveBtn.type = "button"
+    moveBtn.textContent = "Move"
+    moveBtn.addEventListener("click", () => {
+      openMoveVerseModal(verse)
+    })
+
+    const deleteBtn = document.createElement("button")
+    deleteBtn.type = "button"
+    deleteBtn.className = "danger"
+    deleteBtn.textContent = "Delete"
+    deleteBtn.addEventListener("click", () => {
+      confirmDelete(verse.id, row)
+    })
+
+    actions.appendChild(playBtn)
+    actions.appendChild(moveBtn)
+    actions.appendChild(deleteBtn)
+
+    row.appendChild(meta)
+    row.appendChild(actions)
+
+    libraryGrid.appendChild(row)
+  })
+}
+
 
 function confirmDelete(id, row) {
   row.innerHTML = ""

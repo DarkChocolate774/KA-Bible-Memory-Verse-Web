@@ -482,10 +482,17 @@ textarea:disabled {
 
 #libraryFilters {
   margin-bottom: 12px;
+  touch-action: manipulation;
+}
+
+#collectionFilters,
+#groupFilters {
+  touch-action: manipulation;
 }
 
 #libraryFilters .controls {
   margin-top: 6px;
+  touch-action: manipulation;
 }
 
 .miniActions {

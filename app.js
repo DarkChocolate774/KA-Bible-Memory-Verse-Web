@@ -307,6 +307,9 @@ async function loadVersesFromCloud() {
     })
 
     verses = DEFAULT_VERSES.concat(cloudVerses)
+    // Rebuild filter buttons now that we have fresh data, then render cards.
+    renderCollectionFilters()
+    renderGroupFilters()
     renderLibrary()
 
     if (verses.length > 0) {
@@ -1309,8 +1312,60 @@ function renderLibrary() {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Event delegation for the library grid.
+// Instead of attaching Play / Move / Delete / card-click listeners to every
+// single card (which creates hundreds of listeners on a large library and
+// causes Android Chrome to freeze while re-registering touch hit-test
+// regions on every renderLibrary call), we attach FOUR listeners once to
+// the grid container and route by data attributes.
+// ---------------------------------------------------------------------------
+let _libraryDelegationReady = false
+
+function _ensureLibraryDelegation() {
+  if (_libraryDelegationReady) return
+  _libraryDelegationReady = true
+
+  // Timestamp of the last full grid rebuild — used to swallow the ghost
+  // tap that Android Chrome fires ~300 ms after a touchend when the DOM
+  // was rebuilt under the user's finger.
+  let _lastRenderTime = 0
+
+  libraryGrid.addEventListener("_renderDone", () => {
+    _lastRenderTime = Date.now()
+  })
+
+  libraryGrid.addEventListener("click", (event) => {
+    // Swallow ghost taps on freshly rendered cards (Android 300 ms delay).
+    if (Date.now() - _lastRenderTime < 400) return
+
+    const btn = event.target.closest("button[data-action]")
+    const card = event.target.closest(".customItem[data-id]")
+    if (!card) return
+
+    const id = card.dataset.id
+
+    if (btn) {
+      event.stopPropagation()
+      const action = btn.dataset.action
+
+      if (action === "play") { openGamePicker(id); return }
+      if (action === "move") {
+        const verse = verses.find(v => v.id === id)
+        if (verse) openMoveVerseModal(verse)
+        return
+      }
+      if (action === "delete") { confirmDelete(id, card); return }
+    } else {
+      // Tap on the card body itself — open the game picker.
+      openGamePicker(id)
+    }
+  })
+}
+
 function _renderLibraryNow() {
   refreshVerses()
+  _ensureLibraryDelegation()
 
   renderCollectionFilters()
   renderGroupFilters()
@@ -1319,7 +1374,7 @@ function _renderLibraryNow() {
 
   let filteredVerses = verses.slice()
 
-  if (selectedCollectionFilter) {
+  if (selectedCollectionFilter && selectedCollectionFilter !== "") {
     filteredVerses = filteredVerses.filter(
       verse => (verse.collection || "None") === selectedCollectionFilter
     )
@@ -1334,21 +1389,27 @@ function _renderLibraryNow() {
     return
   }
 
+  // Build all cards as a DocumentFragment — a single DOM insertion is far
+  // cheaper than appending one card at a time (each append triggers layout).
+  const fragment = document.createDocumentFragment()
+
   filteredVerses.forEach(verse => {
     const card = document.createElement("div")
     card.className = "customItem"
+    // data-id is read by the delegated listener above — no per-card listeners.
+    card.dataset.id = verse.id
 
     const meta = document.createElement("div")
     meta.className = "meta"
 
     const categoryLine = document.createElement("small")
     categoryLine.textContent = verse.group
-      ? (verse.collection || "None") + " • " + verse.group
+      ? (verse.collection || "None") + " \u2022 " + verse.group
       : (verse.collection || "None")
 
     const title = document.createElement("div")
     title.textContent = verse.title
-      ? verse.title + " • " + (verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref)
+      ? verse.title + " \u2022 " + (verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref)
       : (verse.version ? verse.ref + " (" + verse.version + ")" : verse.ref)
 
     const preview = document.createElement("small")
@@ -1364,29 +1425,20 @@ function _renderLibraryNow() {
     const playBtn = document.createElement("button")
     playBtn.type = "button"
     playBtn.className = "ghost"
+    playBtn.dataset.action = "play"
     playBtn.textContent = "Play"
-    playBtn.addEventListener("click", event => {
-      event.stopPropagation()
-      openGamePicker(verse.id)
-    })
 
     const moveBtn = document.createElement("button")
     moveBtn.type = "button"
     moveBtn.className = "ghost"
-    moveBtn.textContent = "Move 📁"
-    moveBtn.addEventListener("click", event => {
-      event.stopPropagation()
-      openMoveVerseModal(verse)
-    })
+    moveBtn.dataset.action = "move"
+    moveBtn.textContent = "Move \uD83D\uDCC1"
 
     const delBtn = document.createElement("button")
     delBtn.type = "button"
     delBtn.className = "danger"
+    delBtn.dataset.action = "delete"
     delBtn.textContent = "Delete"
-    delBtn.addEventListener("click", event => {
-      event.stopPropagation()
-      confirmDelete(verse.id, card)
-    })
 
     actions.appendChild(playBtn)
     actions.appendChild(moveBtn)
@@ -1394,21 +1446,20 @@ function _renderLibraryNow() {
 
     card.appendChild(meta)
     card.appendChild(actions)
-
-    // Android Chrome fires a synthetic click ~300ms after touchend.
-    // If the grid was rebuilt during that window (e.g. mid-delete), the new
-    // card sitting under the finger receives a ghost click. Record the
-    // card's creation time and ignore clicks that arrive within 400ms of it.
-    const cardCreatedAt = Date.now()
-    card.addEventListener("click", () => {
-      if (Date.now() - cardCreatedAt < 400) return
-      openGamePicker(verse.id)
-    })
-    libraryGrid.appendChild(card)
+    fragment.appendChild(card)
   })
+
+  libraryGrid.appendChild(fragment)
+
+  // Signal the delegated listener that the grid was just rebuilt so it can
+  // ignore the next ghost tap from Android Chrome's 300 ms click delay.
+  libraryGrid.dispatchEvent(new CustomEvent("_renderDone"))
 }
 
 function confirmDelete(id, row) {
+  // Remove data-id so delegated grid listener ignores this card in confirm state
+  delete row.dataset.id
+
   row.innerHTML = ""
 
   const meta = document.createElement("div")
@@ -1758,6 +1809,7 @@ async function loadCollectionsFromCloud() {
 
     collections.sort((a, b) => a.name.localeCompare(b.name))
     renderCollectionOptions()
+    renderCollectionFilters()
   } catch (error) {
     console.error("Load collections failed:", error)
   }
@@ -1785,6 +1837,7 @@ async function loadGroupsFromCloud() {
 
     groups.sort((a, b) => a.name.localeCompare(b.name))
     renderGroupOptions()
+    renderGroupFilters()
   } catch (error) {
     console.error("Load groups failed:", error)
   }

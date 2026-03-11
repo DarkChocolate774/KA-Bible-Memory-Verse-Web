@@ -260,36 +260,9 @@ function showPage(name) {
     return
   }
 
-  if (name === "manage") {
-    pageManage.classList.remove("isHidden")
-    tabManage.classList.add("active")
-    return
-  }
-
-  if (name === "typing") {
-    pageTyping.classList.remove("isHidden")
-    return
-  }
-
-  if (name === "drag") {
-    pageDrag.classList.remove("isHidden")
-    return
-  }
-
-  if (name === "firstletter") {
-    pageFirstLetter.classList.remove("isHidden")
-    return
-  }
-
-  if (name === "move") {
-    pageMoveVerse.classList.remove("isHidden")
-    return
-  }
-
-  if (name === "importcsv") {
-    pageImportCsv.classList.remove("isHidden")
-  }
+  // ... and so on for other pages
 }
+
 
 function getAllCollectionNames() {
   const names = new Set()

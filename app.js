@@ -2447,8 +2447,20 @@ importCollectionSelect.addEventListener("change", () => {
   renderImportGroupOptions(importCollectionSelect.value || "None", "")
 })
 
+window.debugApp = {
+  getVerses: () => verses,
+  getCollections: () => collections,
+  getGroups: () => groups,
+  getUser: () => currentUser,
+  getFilters: () => ({
+    selectedCollectionFilter,
+    selectedGroupFilter
+  })
+}
+
+
+
 initTheme()
 showPage("library")
 refreshVerses()
 loadStats()
-

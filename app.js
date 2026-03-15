@@ -5,7 +5,9 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   onAuthStateChanged,
-  signOut
+  signOut,
+  deleteUser,
+  reauthenticateWithPopup
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"
 
 import {
@@ -42,6 +44,8 @@ let titlePuzzleHidden = []
 let titlePuzzleSlots = []
 let versePuzzleHidden = []
 let versePuzzleSlots = []
+let titleBankItems = []
+let verseBankItems = []
 let selectedTitleBankWord = ""
 let selectedVerseBankWord = ""
 
@@ -120,6 +124,7 @@ const libraryGrid = document.getElementById("libraryGrid")
 
 const themeSelect = document.getElementById("themeSelect")
 const settingsMsg = document.getElementById("settingsMsg")
+const btnDeleteAccount = document.getElementById("btnDeleteAccount")
 const newVersion = document.getElementById("newVersion")
 const btnBackToGame = document.getElementById("btnBackToGame")
 const practiceVerseTitle = document.getElementById("practiceVerseTitle")
@@ -232,7 +237,8 @@ onAuthStateChanged(auth, async (user) => {
     authMsg.textContent = "Signed in as " + (currentUser.displayName || currentUser.email || "User")
     btnLogin.classList.add("isHidden")
     btnLogout.classList.remove("isHidden")
-
+    
+    await loadThemePreference()
     await loadCollectionsFromCloud()
     await loadGroupsFromCloud()
     updateGroupState()
@@ -243,6 +249,9 @@ onAuthStateChanged(auth, async (user) => {
     authMsg.textContent = "Not signed in."
     btnLogin.classList.remove("isHidden")
     btnLogout.classList.add("isHidden")
+
+    applyTheme(getSavedTheme())
+    if (settingsMsg) settingsMsg.textContent = "Theme saved in browser. "
 
     verses = []
     selectedVerseId = ""
@@ -363,21 +372,95 @@ function getSavedTheme() {
   return localStorage.getItem("memoryTheme") || "sepia"
 }
 
+async function deleteCollectionDocsByPath(pathSegments) {
+  const snap = await getDocs(collection(db, ...pathSegments))
+  const tasks = snap.docs.map(docSnap => deleteDoc(docSnap.ref))
+  await Promise.all(tasks)
+}
+
+async function deleteCurrentAccountAfterReauth() {
+  const uid = currentUser.uid
+
+  await deleteCollectionDocsByPath(["users", uid, "verses"])
+  await deleteCollectionDocsByPath(["users", uid, "groups"])
+  await deleteCollectionDocsByPath(["users", uid, "collections"])
+
+  await deleteUser(currentUser)
+
+  if (settingsMsg) settingsMsg.textContent = "Account deleted."
+}
+
+async function deleteCurrentAccount() {
+  if (!currentUser) {
+    if (settingsMsg) settingsMsg.textContent = "Please log in first."
+    return
+  }
+
+  const firstConfirm = window.confirm("Delete your account and all your verses, groups, and collections?")
+  if (!firstConfirm) return
+
+  const secondConfirm = window.confirm("This cannot be undone. Are you sure?")
+  if (!secondConfirm) return
+
+  try {
+    if (settingsMsg) settingsMsg.textContent = "Deleting account..."
+
+    await deleteCurrentAccountAfterReauth()
+  } catch (error) {
+    console.error("Delete account failed:", error)
+
+    if (error.code === "auth/requires-recent-login") {
+      try {
+        await reauthenticateWithPopup(currentUser, provider)
+        await deleteCurrentAccountAfterReauth()
+      } catch (reauthError) {
+        console.error("Reauthentication failed:", reauthError)
+        if (settingsMsg) settingsMsg.textContent = "Reauthentication failed."
+      }
+      return
+    }
+
+    if (settingsMsg) settingsMsg.textContent = "Failed to delete account."
+  }
+}
+
+
 function applyTheme(theme) {
-  document.body.setAttribute("data-theme", theme)
-  if (themeSelect) themeSelect.value = theme
+  const validThemes = ["sepia", "white", "warm", "night", "forest"]
+  const safeTheme = validThemes.includes(theme) ? theme : "sepia"
+  document.body.setAttribute("data-theme", safeTheme)
+  if (themeSelect) themeSelect.value = safeTheme
+}
+
+async function loadThemePreference() {
+  if (!currentUser) {
+    const localTheme = getSavedTheme()
+    applyTheme(localTheme)
+    if (settingsMsg) settingsMsg.textContent = "Theme saved in this browser."
+    return
+  }
+
+  const localTheme = getSavedTheme()
+  applyTheme(localTheme)
+  if (settingsMsg) settingsMsg.textContent = "Theme saved to your account."
 }
 
 function saveTheme(theme) {
   localStorage.setItem("memoryTheme", theme)
   applyTheme(theme)
-  settingsMsg.textContent = "Theme saved."
+
+  if (!currentUser) {
+    if (settingsMsg) settingsMsg.textContent = "Theme saved in this browser."
+    return
+  }
+
+  if (settingsMsg) settingsMsg.textContent = "Theme saved to your account."
 }
 
 function initTheme() {
-  const theme = getSavedTheme()
-  applyTheme(theme)
+  applyTheme(getSavedTheme())
 }
+
 
 function loadVerse(id) {
   const verse = verses.find(v => v.id === id)
@@ -509,6 +592,50 @@ function resetTypeMode() {
   }
 }
 
+function clearSlot(slots, bankItems, slotIndex) {
+  const slot = slots.find(s => s.index === slotIndex)
+  if (!slot || !slot.itemId) {
+    if (slot) slot.filled = ""
+    return
+  }
+
+  const item = bankItems.find(bankItem => bankItem.id === slot.itemId)
+  if (item) {
+    item.placedIn = null
+  }
+
+  slot.filled = ""
+  slot.itemId = ""
+}
+
+function placeBankItemInSlot(slots, bankItems, slotIndex, itemId) {
+  const slot = slots.find(s => s.index === slotIndex)
+  const item = bankItems.find(bankItem => bankItem.id === itemId)
+
+  if (!slot || !item) return
+
+  if (slot.itemId && slot.itemId !== itemId) {
+    clearSlot(slots, bankItems, slotIndex)
+  }
+
+  if (item.placedIn !== null && item.placedIn !== undefined) {
+    clearSlot(slots, bankItems, item.placedIn)
+  }
+
+  slot.filled = item.text
+  slot.itemId = item.id
+  item.placedIn = slotIndex
+}
+
+function makeBankItems(hiddenIndexes, sourceWords, prefix) {
+  return hiddenIndexes.map((index, hiddenPosition) => ({
+    id: `${prefix}-${index}-${hiddenPosition}`,
+    text: sourceWords[index],
+    homeIndex: index,
+    placedIn: null
+  }))
+}
+
 function buildDragPuzzle() {
   const ratio = getDifficultyRatio()
 
@@ -521,6 +648,8 @@ function buildDragPuzzle() {
   titlePuzzleSlots = []
   versePuzzleHidden = []
   versePuzzleSlots = []
+  titleBankItems = []
+  verseBankItems = []
 
   selectedTitleBankWord = ""
   selectedVerseBankWord = ""
@@ -536,8 +665,11 @@ function buildDragPuzzle() {
   titlePuzzleSlots = titlePuzzleHidden.map(index => ({
     index,
     expected: titleWords[index],
-    filled: ""
+    filled: "",
+    itemId: ""
   }))
+
+  titleBankItems = makeBankItems(titlePuzzleHidden, titleWords, "title")
 
   const verseIndexes = verseWords.map((word, index) => index)
   while (versePuzzleHidden.length < verseHideCount && verseIndexes.length > 0) {
@@ -550,8 +682,11 @@ function buildDragPuzzle() {
   versePuzzleSlots = versePuzzleHidden.map(index => ({
     index,
     expected: verseWords[index],
-    filled: ""
+    filled: "",
+    itemId: ""
   }))
+
+  verseBankItems = makeBankItems(versePuzzleHidden, verseWords, "verse")
 
   updateDifficultyButtons()
   renderDragPuzzle()
@@ -598,14 +733,14 @@ function renderDragPuzzle() {
           if (!currentSlot) return
 
           if (selectedTitleBankWord) {
-            currentSlot.filled = selectedTitleBankWord
+            placeBankItemInSlot(titlePuzzleSlots, titleBankItems, i, selectedTitleBankWord)
             selectedTitleBankWord = ""
             renderDragPuzzle()
             return
           }
 
           if (currentSlot.filled) {
-            currentSlot.filled = ""
+            clearSlot(titlePuzzleSlots, titleBankItems, i)
             renderDragPuzzle()
           }
         })
@@ -620,19 +755,20 @@ function renderDragPuzzle() {
       titleBlankLine.appendChild(document.createTextNode(" "))
     }
 
-    const titleBankWords = titlePuzzleSlots
-      .filter(slot => !slot.filled)
-      .map(slot => slot.expected)
+    const titleAvailableBankItems = titleBankItems
+      .filter(item => item.placedIn === null)
+      .sort(() => Math.random() - 0.5)
 
-    titleBankWords.sort(() => Math.random() - 0.5)
-
-    titleBankWords.forEach(word => {
+    titleAvailableBankItems.forEach(item => {
       const pill = document.createElement("span")
       pill.className = "pill"
-      pill.textContent = word
+      pill.textContent = item.text
+      if (selectedTitleBankWord === item.id) {
+        pill.classList.add("active")
+      }
 
       pill.addEventListener("click", () => {
-        selectedTitleBankWord = word
+        selectedTitleBankWord = item.id
         titleWordBank.querySelectorAll(".pill").forEach(p => p.classList.remove("active"))
         pill.classList.add("active")
       })
@@ -656,14 +792,14 @@ function renderDragPuzzle() {
         if (!currentSlot) return
 
         if (selectedVerseBankWord) {
-          currentSlot.filled = selectedVerseBankWord
+          placeBankItemInSlot(versePuzzleSlots, verseBankItems, i, selectedVerseBankWord)
           selectedVerseBankWord = ""
           renderDragPuzzle()
           return
         }
 
         if (currentSlot.filled) {
-          currentSlot.filled = ""
+          clearSlot(versePuzzleSlots, verseBankItems, i)
           renderDragPuzzle()
         }
       })
@@ -678,19 +814,20 @@ function renderDragPuzzle() {
     blankLine.appendChild(document.createTextNode(" "))
   }
 
-  const verseBankWords = versePuzzleSlots
-    .filter(slot => !slot.filled)
-    .map(slot => slot.expected)
+  const verseAvailableBankItems = verseBankItems
+    .filter(item => item.placedIn === null)
+    .sort(() => Math.random() - 0.5)
 
-  verseBankWords.sort(() => Math.random() - 0.5)
-
-  verseBankWords.forEach(word => {
+  verseAvailableBankItems.forEach(item => {
     const pill = document.createElement("span")
     pill.className = "pill"
-    pill.textContent = word
+    pill.textContent = item.text
+    if (selectedVerseBankWord === item.id) {
+      pill.classList.add("active")
+    }
 
     pill.addEventListener("click", () => {
-      selectedVerseBankWord = word
+      selectedVerseBankWord = item.id
       wordBank.querySelectorAll(".pill").forEach(p => p.classList.remove("active"))
       pill.classList.add("active")
     })
@@ -1008,7 +1145,10 @@ function revealOneBlank() {
 
   if (emptyTitle.length > 0) {
     const pick = emptyTitle[Math.floor(Math.random() * emptyTitle.length)]
-    pick.filled = pick.expected
+    const item = titleBankItems.find(bankItem => bankItem.homeIndex === pick.index && bankItem.placedIn === null)
+    if (item) {
+      placeBankItemInSlot(titlePuzzleSlots, titleBankItems, pick.index, item.id)
+    }
     selectedTitleBankWord = ""
     renderDragPuzzle()
     return
@@ -1016,7 +1156,10 @@ function revealOneBlank() {
 
   if (emptyVerse.length > 0) {
     const pick = emptyVerse[Math.floor(Math.random() * emptyVerse.length)]
-    pick.filled = pick.expected
+    const item = verseBankItems.find(bankItem => bankItem.homeIndex === pick.index && bankItem.placedIn === null)
+    if (item) {
+      placeBankItemInSlot(versePuzzleSlots, verseBankItems, pick.index, item.id)
+    }
     selectedVerseBankWord = ""
     renderDragPuzzle()
   }
@@ -2525,6 +2668,11 @@ pasteBox.addEventListener("paste", () => {
 themeSelect.addEventListener("change", event => {
   saveTheme(event.target.value)
 })
+
+if (btnDeleteAccount) {
+  btnDeleteAccount.addEventListener("click", deleteCurrentAccount)
+}
+
 
 btnImportCsvPage.addEventListener("click", () => showPage("importCsv"))
 

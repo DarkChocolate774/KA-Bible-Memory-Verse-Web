@@ -1,122 +1,240 @@
+<!-- Tell the browser this file uses HTML5 -->
 <!DOCTYPE html>
+
+<!-- Start of the HTML page. Language set to English -->
 <html lang="en">
 
+<!-- Head section. Contains page settings, not visible content -->
 <head>
+
+    <!-- Allow the page to display normal characters correctly -->
     <meta charset="UTF-8">
+
+    <!-- Make the page fit phone screens -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+    <!-- Load the CSS file which controls the design -->
     <link rel="stylesheet" href="style.css">
+
+    <!-- Text shown on the browser tab -->
     <title>Scripture Memory</title>
+
 </head>
 
+<!-- Start of the visible page. data-theme="sepia" sets the default color theme when the page first loads. -->
 <body data-theme="sepia">
 
+    <!-- Main wrapper for the whole app.
+    This keeps all page content inside one layout container. -->
     <main class="wrap">
 
+        <!-- Top header section of the app -->
         <header class="top">
-            <h1>Scripture Memory</h1>
-            <p class="sub">Pick a verse. Choose a game. Memorize step by step.</p>
 
+            <!-- Main app title shown at the top -->
+            <h1>Scripture Memory</h1>
+
+            <!-- Short subtitle that explains what the app does -->
+            <p class="sub">Pick a verse. Choose a game. Memorize step by step.</p>
+            
+            <!-- Simple line break for spacing -->
             <br>
 
+            <!-- Container for top navigation area -->
             <div class="topNav">
+
+                <!-- Tab buttons for switching between pages -->
                 <div class="tabs">
+
+                    <!-- Button to open the Library page -->
                     <button type="button" id="tabLibrary" class="tab">Library</button>
+
+                    <!-- Button to open the Settings page -->
                     <button type="button" id="tabSettings" class="tab">Settings</button>
                 </div>
 
+                <!-- Container for login and logout buttons -->
                 <div class="authControls">
+
+                    <!-- Button for signing in with Google -->
                     <button type="button" id="btnLogin">Login with Google</button>
+
+                    <!-- Button for signing out. Hidden at first because user is not signed in yet. -->
                     <button type="button" id="btnLogout" class="isHidden">Logout</button>
                 </div>
             </div>
 
+            <!-- Status message area for login state -->
             <div class="result" id="authMsg">Not signed in.</div>
-
 
         </header>
 
+        <!-- Space below the header -->
         <br>
 
+        <!-- Practice page.
+                 Hidden by default until the user starts a game. -->
         <section id="pagePractice" class="isHidden">
 
+            <!-- Card container for practice mode content -->
             <section class="card">
 
+                <!-- Row for showing the selected verse reference -->
                 <div class="row">
+
+                    <!-- Label for the verse reference -->
                     <label>Verse</label>
+
+                    <!-- JavaScript inserts the verse reference here -->
                     <div class="ref" id="practiceVerseTitle"></div>
+
                 </div>
 
+                <!-- JavaScript inserts the optional title here -->
                 <div class="ref" id="practiceTitle"></div>
 
+                <!-- JavaScript inserts the verse text here -->
                 <div class="verse" id="verseText"></div>
 
+                <!-- First letter mode section.
+                         Hidden until first letter mode is selected. -->
                 <div id="lettersGame" class="isHidden">
+
+                    <!-- Title area for first letter mode.
+                             Hidden if there is no title. -->
                     <div id="titleLettersSection" class="verse isHidden">
+
+                        <!-- Label for title practice -->
                         <label>Title</label>
+
+                        <!-- JavaScript inserts title first-letter practice here -->
                         <div id="titleLettersGame"></div>
                     </div>
 
+                    <!-- Verse area for first letter mode -->
                     <div class="verse">
+
+                        <!-- Label for verse practice -->
                         <label>Verse</label>
+
+                        <!-- JavaScript inserts verse first-letter practice here -->
                         <div id="verseLettersGame"></div>
                     </div>
                 </div>
 
+                <!-- Tap words into blanks game section.
+                         Hidden until this mode is selected. -->
                 <div id="dragGame" class="isHidden">
+
+                    <!-- Difficulty selection row -->
                     <div class="row">
+
+                        <!-- Label for difficulty buttons -->
                         <label>Difficulty</label>
+
+                        <!-- Container for difficulty buttons -->
                         <div class="controls" id="tapDifficultyRow">
+
+                            <!-- Easy difficulty button. Active by default. -->
                             <button type="button" id="difficultyEasy" class="difficultyBtn active">Easy</button>
-                            <button type="button" id="difficultyMedium" class="difficultyBtn">Medium</button>
+
+                            <!-- Medium difficulty button -->
+                            <button type="button" id="difficultyMedium" 
+                            class="difficultyBtn">Medium</button>
+
+                            <!-- Hard difficulty button -->
                             <button type="button" id="difficultyHard" class="difficultyBtn">Hard</button>
                         </div>
                     </div>
 
+                    <!-- Title blank-filling section. Hidden if there is no title. -->
                     <div id="titleDragSection" class="isHidden">
+
+                        <!-- Label for title blank game -->
                         <label>Title</label>
+
+                        <!-- JavaScript shows title blanks here -->
                         <div class="verse" id="titleBlankLine"></div>
+
+                        <!-- JavaScript shows title word choices here -->
                         <div id="titleWordBank" class="controls"></div>
+
+                        <!-- Separator line -->
                         <hr class="sep">
                     </div>
 
+                    <!-- Label for verse blank game -->
                     <label>Verse</label>
+
+                    <!-- JavaScript shows verse blanks here -->
                     <div class="verse" id="blankLine"></div>
+
+                    <!-- JavaScript shows verse word choices here -->
                     <div id="wordBank" class="controls"></div>
                 </div>
 
+                <!-- Container for reveal button -->
                 <div class="controls">
+
+                    <!-- Button to reveal or hide all words in typing mode -->
                     <button type="button" id="btnHideAll">Reveal All</button>
+
                 </div>
 
+                <!-- Separator line -->
                 <hr class="sep">
 
+                <!-- Row for typing the title from memory. Hidden unless the title input is needed. -->
                 <div class="row isHidden" id="titleAnswerRow">
+
+                    <!-- Label for title input -->
                     <label>Type Title from Memory</label>
+
+                    <!-- Input box for typing the title -->
                     <input id="titleAnswer" type="text" placeholder="Type title here.">
                 </div>
 
+                <!-- Row for typing the verse from memory -->
                 <div class="row" id="answerRow">
+
+                    <!-- Label for verse typing area -->
                     <label>Type from Memory</label>
+
+                    <!-- Textarea for typing the verse -->
                     <textarea id="answer" rows="4"></textarea>
                 </div>
 
+
+                <!-- Container for practice action buttons -->
                 <div class="controls">
+
+                    <!-- Reset the current practice mode -->
                     <button type="button" id="btnReset">Reset</button>
+                    
+                     <!-- Give the user a hint -->
                     <button type="button" id="btnGiveHint">Hint</button>
+
+                    <!-- Check the user's answer -->
                     <button type="button" id="btnCheck">Check</button>
                 </div>
 
+                <!-- Area for showing result messages or score -->
                 <div class="result" id="result"></div>
+
+                <!-- Area for showing practice statistics -->
                 <div class="stats" id="stats"></div>
 
+                <!-- Container for back button -->
                 <div class="controls">
+
+                    <!-- Return to the game selection page -->
                     <button type="button" id="btnBackToGame">Back</button>
                 </div>
 
             </section>
         </section>
 
-
+        <!--STOP HERE!-->
 
         <section id="pageLibrary">
 

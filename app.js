@@ -1,5 +1,25 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"
 
+import { getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"
+
+async function ensureUserDoc(user) {
+
+  const userRef = doc(db, "users", user.uid)
+
+  const snap = await getDoc(userRef)
+
+  if (!snap.exists()) {
+
+    await setDoc(userRef, {
+      email: user.email || "",
+      name: user.displayName || "",
+      createdAt: serverTimestamp()
+    })
+
+  }
+
+}
+
 import {
   getAuth,
   GoogleAuthProvider,
@@ -238,6 +258,10 @@ onAuthStateChanged(auth, async (user) => {
     btnLogin.classList.add("isHidden")
     btnLogout.classList.remove("isHidden")
     
+
+    await ensureUserDoc(currentUser)
+    authMsg.textContent = "Signed in as " + (currentUser.displayName || currentUser.email || "User")
+
     await loadThemePreference()
     await loadCollectionsFromCloud()
     await loadGroupsFromCloud()
@@ -385,6 +409,7 @@ async function deleteCurrentAccountAfterReauth() {
   await deleteCollectionDocsByPath(["users", uid, "groups"])
   await deleteCollectionDocsByPath(["users", uid, "collections"])
 
+  await deleteDoc(doc(db, "users", uid))
   await deleteUser(currentUser)
 
   if (settingsMsg) settingsMsg.textContent = "Account deleted."

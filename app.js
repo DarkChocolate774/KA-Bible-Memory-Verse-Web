@@ -8,14 +8,21 @@ async function ensureUserDoc(user) {
 
   const snap = await getDoc(userRef)
 
+  console.log("User logged in:", user.uid)
+
   if (!snap.exists()) {
+
+     console.log("Creating NEW Firestore user")
 
     await setDoc(userRef, {
       email: user.email || "",
       name: user.displayName || "",
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      welcomeEmailSent: false
     })
 
+  } else {
+    console.log("User already exists, skip create")
   }
 
 }
@@ -87,6 +94,7 @@ let selectedCollectionFilter = ""
 let selectedGroupFilter = ""
 let moveVerseId = ""
 let isRenderingLibrary = false
+let libraryScrollY = 0
 
 const btnLogin = document.getElementById("btnLogin")
 const btnLogout = document.getElementById("btnLogout")
@@ -1326,8 +1334,13 @@ function showPage(name) {
     pageLibrary.classList.remove("isHidden")
     tabLibrary.classList.add("active")
     renderLibrary()
+
+    setTimeout(() => {
+      window.scrollTo(0, libraryScrollY)
+    }, 0)
+
     return
-  }
+}
 
   if (name === "addCollection") {
     pageAddCollection.classList.remove("isHidden")
@@ -2672,6 +2685,12 @@ btnAutoFill.addEventListener("click", autoFillFromPastedText)
 btnSaveVerse.addEventListener("click", saveNewVerse)
 btnClearVerse.addEventListener("click", clearVerseForm)
 btnBackToLibrary.addEventListener("click", () => showPage("library"))
+btnBackToLibrary.addEventListener("click", () => {
+  showPage("library")
+  setTimeout(() => {
+    window.scrollTo(0, libraryScrollY)
+  }, 0)
+})
 
 btnLogin.addEventListener("click", loginWithGoogle)
 btnLogout.addEventListener("click", logoutUser)
@@ -2719,6 +2738,12 @@ window.debugApp = {
     selectedGroupFilter
   })
 }
+
+window.addEventListener("scroll", () => {
+  if (!pageLibrary.classList.contains("isHidden")) {
+    libraryScrollY = window.scrollY
+  }
+})
 
 
 

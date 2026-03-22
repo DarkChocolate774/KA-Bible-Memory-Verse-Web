@@ -1518,14 +1518,14 @@ function _renderLibraryNow() {
 
     const playBtn = document.createElement("button")
     playBtn.type = "button"
-    playBtn.textContent = "Play"
+    playBtn.textContent = "Play 📖"
     playBtn.addEventListener("click", () => {
       openGamePicker(verse.id)
     })
 
     const moveBtn = document.createElement("button")
     moveBtn.type = "button"
-    moveBtn.textContent = "Move"
+    moveBtn.textContent = "Move 📁"
     moveBtn.addEventListener("click", () => {
       openMoveVerseModal(verse)
     })
@@ -1533,7 +1533,7 @@ function _renderLibraryNow() {
     const deleteBtn = document.createElement("button")
     deleteBtn.type = "button"
     deleteBtn.className = "danger"
-    deleteBtn.textContent = "Delete"
+    deleteBtn.textContent = "Delete 🗑️"
     deleteBtn.addEventListener("click", () => {
       confirmDelete(verse.id, row)
     })
